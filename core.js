@@ -175,139 +175,59 @@
     return ':root {\n'+list.map(([k,v])=>'  --'+k+': '+v+';').join('\n')+'\n}';
   }
   function markdown(s) {
-    const sizes=typeSizes(s),mobile=mobileSizes(s),b=buttonValues(s);
-    const n=mdInline(s.name),image=s.imageData?`Uploaded asset: ${mdInline(s.imageName || 'background image')}. Attach this image separately; it is not embedded in this Markdown.`:s.imageUrl?`Image URL: ${mdInline(s.imageUrl)}`:'No image selected. The preview uses a CSS composition as an image-treatment sample; it is not a photography reference.';
-    const imageWords={natural:'Natural light, quiet compositions, believable textures; avoid artificial gloss.',editorial:'Editorial photography, deliberate crops, a clear focal point, and consistent art direction.',graphic:'Graphic objects and strong silhouettes; purposeful geometry with clean compositions.',documentary:'Candid, authentic documentary photography with believable settings and natural human detail.'};
-    const checks=[['Text / background',s.text,s.background],['Muted / background',s.muted,s.background],['Button label / primary',s.onPrimary,s.primary],['Text / surface',s.text,s.surface],['Link / background',linkColor(s),s.background],['Focus / background',s.focusColor,s.background]];
-    const warnings=checks.filter(([,a,c],i)=>contrast(a,c)<(i===5?3:4.5));
-    const checkRows=checks.map(([label,a,c],i)=>{const ratio=contrast(a,c),limit=i===5?3:4.5;return `| ${label} | ${ratio.toFixed(2)}:1 | ${ratio>=limit?'Pass':'Needs adjustment'} (${limit}:1) |`;}).join('\n');
-    return `# ${n} — UI style guide
+    const sizes=typeSizes(s), mobile=mobileSizes(s), b=buttonValues(s);
+    const fontsUsed=[...new Set([s.headingFont,s.bodyFont])];
+    const links=fontsUsed.map(name=>[name,fontUrl(name,[s.headingWeight,s.bodyWeight||400,s.buttonWeight,600])]).filter(([,url])=>url).map(([name,url])=>`- [${mdInline(name)}](${url})`).join('\n');
+    const image=s.imageData?`Uploaded image: ${mdInline(s.imageName || 'background image')} (attach separately).`:s.imageUrl?`Image URL: ${mdInline(s.imageUrl)}`:'No image selected.';
+    return `# ${mdInline(s.name)} — Style guide
 
-> Treat this guide as the visual and interaction contract for the next design. Use the exact values below. Where a decision is not specified, follow the stated intent and existing tokens; ask before inventing a new visual direction.
+## Colors
 
-## 1. Intent and personality
+| Role | Color |
+| --- | --- |
+${palette.map(([key,label])=>`| ${label} | ${s[key]} |`).join('\n')}
+| Link | ${linkColor(s)} |
+| Focus ring | ${s.focusColor} |
 
-${s.intent.trim()}
+## Typography
 
-${s.personality.trim()}
+- Heading font: ${mdInline(s.headingFont)} (${fonts[s.headingFont]}); weight ${s.headingWeight}; line height ${s.headingLine}; letter spacing ${s.tracking}em.
+- Body font: ${mdInline(s.bodyFont)} (${fonts[s.bodyFont]}); size ${s.bodySize}px; weight ${s.bodyWeight||'400'}; line height ${s.bodyLine}; reading width ${s.measure}ch.
+- Small text: ${s.smallTextSize}px. Button text: ${s.buttonTextSize}px. Card title: ${s.cardTitleSize}px. Card body: ${s.cardTextSize}px.
 
-Starting direction: ${presetInfo[s.preset]?.[0] || 'Custom'}. ${presetInfo[s.preset]?.[1]!=='Original'?'An independent interpretation inspired by '+presetInfo[s.preset]?.[1]+'; the values below are this project’s chosen specification, not official brand tokens.':'An original Studio direction, customized by this project.'}
-${presetInfo[s.preset]?.[4]?'\nReference: ['+mdInline(presetInfo[s.preset][1])+']('+presetInfo[s.preset][4]+'). The chosen values remain editable.':''}
-
-### Do
-
-${ruleLines(s.doRules) || '- Keep decisions consistent with this guide.'}
-
-### Avoid
-
-${ruleLines(s.avoidRules) || '- Avoid decoration that has no purpose.'}
-
-## 2. Color system
-
-| Semantic role | Hex | Usage |
+| Heading | Desktop | Mobile (≤600px) |
 | --- | --- | --- |
-${palette.map(([key,label])=>`| ${label} | ${s[key]} | ${{background:'Default page canvas',surface:'Cards and elevated content',text:'Headings and essential copy',muted:'Supporting text; never reduce opacity further',primary:'Primary action fills and meaningful emphasis',onPrimary:'Text and icons on primary fill',border:'Subtle decorative dividers and surface edges'}[key]} |`).join('\n')}
+${sizes.map((v,i)=>`| H${i+1} | ${v}px | ${mobile[i]}px |`).join('\n')}
+${links?'\nGoogle Fonts:\n'+links+'\n':''}
+## Spacing and layout
 
-- Use semantic roles consistently. Do not introduce arbitrary hex values.
-- Border is a decorative token. Essential input outlines and state indicators need at least 3:1 contrast against adjacent colors; use an adjusted text/focus token where necessary.
-- Link color alone is insufficient; keep links underlined in body copy.
-- Body link color: ${linkColor(s)}. Use primary when it reaches 4.5:1 on the page background; otherwise use the text token. This keeps bright action fills separate from readable body links without introducing another palette color.
+- Base spacing: ${s.spacing}px; scale: ${[1,2,3,4,6,8].map(v=>v*s.spacing+'px').join(', ')}.
+- Section spacing: ${s.sectionSpace}px. Content max width: ${s.contentWidth}px.
 
-### Contrast audit
+## Buttons
 
-| Pairing | Contrast | Result / required minimum |
-| --- | --- | --- |
-${checkRows}
+- Height: ${b.height}px; horizontal padding: ${b.padding}px; radius: ${b.radius}px.
+- Font: body font, ${s.buttonTextSize}px, weight ${s.buttonWeight}.
+- Primary: ${s.primary} background, ${s.onPrimary} text.
+- Secondary: transparent background, ${s.text} text, ${s.border} border.
+- Text button: transparent background, ${linkColor(s)} text.
+- Trailing arrow: ${s.buttonArrow?'on':'off'}. Hover: ${s.buttonHover}. Motion: ${s.duration}ms.
 
-${warnings.length?'**Before shipping:** Adjust the failing pairings above. These are user-selected values, not automatic accessibility approval.':'All listed solid-color text pairings meet the stated thresholds.'} Image overlays, hover states, secondary buttons, and focus on other surfaces require separate checks in the final UI.
+## Cards
 
-## 3. Typography
-
-- Heading family: ${fonts[s.headingFont]}.
-- Body and controls: ${fonts[s.bodyFont]}.
-- Heading weight: ${s.headingWeight}. Heading line-height: ${s.headingLine}. Tracking: ${s.tracking}em.
-- Body size: ${s.bodySize}px; weight: ${s.bodyWeight||'400'}; line-height: ${s.bodyLine}; tracking: normal.
-- Heading sizes are independently set for H1–H6 on desktop and mobile. Scale ${s.scale} is an optional generation shortcut; changing one size must not resize the other levels.
-- Comfortable reading measure: ${s.measure}ch. Body links are underlined. Strong text uses the nearest supported weight to 600 (${nearestWeight(s.bodyFont,600)}).
-- Small text: ${s.smallTextSize}px. Button labels: ${s.buttonTextSize}px. Card titles: ${s.cardTitleSize}px. Card body text: ${s.cardTextSize}px. Keep important instructions comfortably readable.
-- Load the chosen families through Google Fonts or a licensed local source. Use the declared fallback stacks when fonts are unavailable. Do not substitute a new visual style silently.
-${[...new Set([s.headingFont,s.bodyFont])].map(name=>[name,fontUrl(name,[s.headingWeight,s.bodyWeight||400,s.buttonWeight,600])]).filter(([,url])=>url).map(([name,url])=>'- Google Fonts stylesheet: ['+mdInline(name)+']('+url+')').join('\n')}
-
-| Level | Desktop size | Mobile size (≤600px content width) | Weight | Line height | Letter spacing |
-| --- | --- | --- | --- | --- | --- |
-${sizes.map((v,i)=>`| H${i+1} | ${v}px | ${mobile[i]}px | ${s.headingWeight} | ${s.headingLine} | ${s.tracking}em |`).join('\n')}
-
-These sizes are exact user choices, not a requirement to use every heading level. Use one H1, then semantic heading order. Card titles use their separate ${s.cardTitleSize}px token; specimen section labels are part of the guide layout. On mobile, use the mobile values exactly and allow natural wrapping. Review very small sizes for readability.
-
-## 4. Layout and spacing
-
-- Content max-width: ${s.contentWidth}px, centered.
-- Grid rhythm: ${s.spacing}px. Space scale: ${[1,2,3,4,6,8].map(v=>v*s.spacing+'px').join(', ')}.
-- Default section block padding: ${s.sectionSpace}px. Compact specimens use about 70% of this value.
-- Page inline gutter: about 5.7% of the content width; maintain at least 20px on small screens.
-- At content width ≤600px: collapse cards/forms to one column, cap the heading sizes as above, and use 40px section padding where appropriate.
-- Align to a deliberate grid. Choose section structures based on content, rather than repeating one card pattern everywhere.
-
-## 5. Buttons and interaction states
-
-- Shape: ${s.buttonShape}; radius: ${b.radius}px.
-- Minimum visual height: ${b.height}px; inline padding: ${b.padding}px; block padding: 10px. Maintain at least a 44×44px interaction target; expand the hit area for compact controls.
-- Font: body family, ${s.buttonTextSize}px, weight ${s.buttonWeight}, line-height 1.3.
-- Primary: fill ${s.primary}, label ${s.onPrimary}, transparent 1px border.
-- Secondary: transparent fill, text ${s.text}, 1px ${s.border} border. Its text communicates the action; strengthen the border if needed to identify the control.
-- Text action: transparent, color ${linkColor(s)} (the readable link token); no decorative container. Preserve an accessible hit area and a clear label.
-- Trailing arrow: ${s.buttonArrow?'enabled; a small 25px circular detail in 14% currentColor with a decorative 15px arrow. Keep a clear accessible text label.':'disabled; use clear text labels without a trailing circle.'}
-- Hover: ${{lift:'translateY(-2px); retain the fill and label colors.',tone:'brightness(0.87); verify the resulting label contrast.',none:'no motion or color transformation; keep a clear focus and pressed state.'}[s.buttonHover]}
-- Pressed: return to translateY(0); do not remove the label.
-- Disabled: opacity 0.38; native disabled attribute; no hover transformation. Never make essential information available only through a disabled control.
-- Focus-visible: 3px solid ${s.focusColor}, offset 4px; never remove keyboard focus outlines.
-- Motion: ${s.duration}ms, ease. Respect prefers-reduced-motion: remove transforms, animation, and nonessential transitions.
-
-## 6. Cards, forms, and surfaces
-
-- Surface: ${s.surface}; text: ${s.text}; supporting text: ${s.muted}.
-- Card radius: ${s.radius}px. Padding: ${s.cardPadding}px. Treatment: ${s.cardStyle}.
+- Background: ${s.surface}; text: ${s.text}; muted text: ${s.muted}.
+- Radius: ${s.radius}px; padding: ${s.cardPadding}px; treatment: ${s.cardStyle}.
 - Border: ${s.cardStyle==='border'?`1px solid ${s.border}`:'none'}. Shadow: ${s.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none'}.
-- Image ratio: ${s.imageRatio.replace(' / ',':')}; object-fit: cover; focal point: ${s.imagePosition}; grayscale: ${s.grayscale}%; clip image to card edges.
-- Card title: ${s.cardTitleSize}px in heading family. Card text: ${s.cardTextSize}px with body line-height. Let content determine card height.
-- Forms: persistent visible labels, clear helper/error text, correct input types, and descriptive submit labels. Use the body font. The specimen uses minimal underline inputs, transparent fill, 10px vertical padding, and a 1px border token.
-- Verify essential input boundaries reach 3:1 contrast or strengthen them using the text/focus palette. Preserve native validation and announce success/errors to assistive technology.
+- Title: ${s.cardTitleSize}px, heading font. Body: ${s.cardTextSize}px, body font.
 
-## 7. Backgrounds, imagery, and overlays
+## Background and imagery
 
-- Section background mode: **${s.backgroundStyle}**.
-- Base color: ${s.sectionBg}. Second gradient color: ${s.sectionEnd}. Gradient angle: ${s.gradientAngle}deg.
-- Section text: ${s.sectionText}. Example outlined CTA inherits the section text color for both label and border.
-- ${s.backgroundStyle==='gradient'?`Background CSS: linear-gradient(${s.gradientAngle}deg, ${s.sectionBg}, ${s.sectionEnd}).`:s.backgroundStyle==='image'?'Render the selected image as a covering layer over the base color. Apply the grayscale filter only to the image layer.':'Render a solid base color.'}
+- Background style: ${s.backgroundStyle}; base ${s.sectionBg}; text ${s.sectionText}${s.backgroundStyle==='gradient'?`; gradient end ${s.sectionEnd}, angle ${s.gradientAngle}deg`:''}.
+- Image direction: ${s.imageDirection}; ratio: ${s.imageRatio}; position: ${s.imagePosition}; grayscale: ${s.grayscale}%.
 - ${image}
-- Image direction: ${imageWords[s.imageDirection]}
-- Background sizing: cover. Position: ${s.imagePosition}. Image filter: grayscale(${s.grayscale}%).
-- Overlay: ${s.overlayStyle}; color ${s.overlayColor}; opacity ${s.overlayOpacity}%${s.overlayStyle==='gradient'?'; fade from transparent at top to the selected opacity at bottom (to top gradient).':'.'}
-- Layer order: base → image/gradient → overlay → content. Keep the text layer unfiltered and fully opaque.
-- Apply the configured image treatment to content-card images too. The overlay applies only to the background section.
-- Never assume image contrast passes. Check text at its actual placement across viewport sizes; adjust the chosen text/overlay/background values or move the text onto a solid surface.
-- Use meaningful alt text for informative images and empty alt text for decoration. Avoid stretching images or inventing irrelevant stock imagery.
-
-## 8. Tokens to implement
-
-\`\`\`css
-${cssTokens(s)}
-\`\`\`
-
-Use the mobile heading tokens at ≤600px content width via a container query or an equivalent viewport breakpoint for full-width layouts. Use rem equivalents if the base is 16px; preserve browser text zoom. Component behavior and image/overlay modes are specified above, not solely by the token block.
-
-## 9. Implementation brief for the AI
-
-1. Read this entire guide before designing. Follow the exact tokens, font pairing, component treatment, and creative rules.
-2. Use semantic HTML, CSS, and vanilla JavaScript unless the project brief requests another stack. Keep content and interaction behavior meaningful.
-3. Start with the page's actual purpose and content. Establish hierarchy, alignment, and useful whitespace before adding visual decoration.
-4. Include responsive layouts, keyboard navigation, visible focus, labeled forms, and reduced-motion support. Verify color contrast; do not ship failed pairings from this guide.
-5. Use supplied assets and authentic copy. Do not add ornamental patterns, badges, gradients, or repeated card grids that conflict with the direction.
-6. If the brief requires something this guide does not define, use the closest existing token. Explain any necessary deviations rather than silently introducing a competing visual language.
-
----
-Generated with Styleguide Studio · Project schema v1. This is a visual specification, not a finished accessibility certification.
+- Overlay: ${s.overlayStyle}; color ${s.overlayColor}; opacity ${s.overlayOpacity}%.
 `;
   }
+
   return {fonts,fontCatalog,fontMetadata,validFontName,registerFont,weightsFor,nearestWeight,fontUrl,palette,presets,presetInfo,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,linkColor,scaleSizes,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
 });
