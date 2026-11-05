@@ -187,3 +187,16 @@
 @container (max-width:600px) { .preview-page .background-content h2 { font-size: var(--mobile-h2,36px); } }
 @media(min-width:1600px) { .preset-source { margin-left: 28px; margin-right: 28px; } }
 @media(max-width:780px) { .preset-source { margin-left: 20px; margin-right: 20px; } .heading-size-row input[type="number"] { font-size: 14px; } }
+
+/* Instant font and preset navigation. */
+.preset-control{display:flex;gap:6px;margin:0 24px 7px;min-width:0}
+.preset-control .preset-select{flex:1;min-width:0;width:0;margin:0}
+.selector-steps{display:flex;gap:3px;flex-shrink:0}
+.selector-step{display:inline-flex;align-items:center;justify-content:center;width:30px;min-height:38px;padding:4px;border:1px solid var(--app-line);border-radius:4px;background:var(--app-soft);color:var(--app-ink)}
+.selector-step svg{width:16px;height:16px}
+.selector-step:hover:not(:disabled){background:var(--app-selected)}
+.selector-step:disabled{opacity:.32}
+.selector-hint{margin:0 24px 10px;color:var(--app-muted);font-size:10px;line-height:1.5}
+.font-control select{flex:1;width:0}
+@media(min-width:1600px){.preset-control,.selector-hint{margin-left:28px;margin-right:28px}}
+@media(max-width:780px){.preset-control,.selector-hint{margin-left:20px;margin-right:20px}.selector-step{width:32px;min-height:40px}}

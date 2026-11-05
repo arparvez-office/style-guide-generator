@@ -36,7 +36,7 @@
     $$('.font-select').forEach(select=>{const oldValue=select.value;select.replaceChildren(...names.map(name=>new Option(name,name)));select.value=oldValue;});
   }
   populateFontSelects();
-  $('#font-catalog-note').textContent=C.fontCatalog.families.length.toLocaleString()+' Google Fonts + 2 system families. Use the search button to browse.';
+  $('#font-catalog-note').textContent=C.fontCatalog.families.length.toLocaleString()+' Google Fonts + 2 system families. Focus a selector and press ↑ / ↓ for instant preview, or use the arrow buttons. Search to filter.';
   function syncWeights(){
     for(const [key,font] of [['headingWeight',state.headingFont],['bodyWeight',state.bodyFont],['buttonWeight',state.bodyFont]]){
       state[key]=C.nearestWeight(font,state[key]||400);
@@ -61,6 +61,7 @@
     $$('[data-key]').forEach(el=>{const value=state[el.dataset.key];if(el.type==='checkbox')el.checked=value;else el.value=value;el.removeAttribute('aria-invalid');});
     $('#preset').value=state.preset;
     syncPresetNote();
+    refreshSelectorSteps();
   }
   function persist() {
     clearTimeout(saveTimer);
@@ -92,6 +93,7 @@
     if(key==='buttonRadius'){state.buttonShape=value===0?'square':value===8?'rounded':value===999?'pill':'custom';$('[data-key="buttonShape"]').value=state.buttonShape;}
     $$(`[data-key="${key}"]`).forEach(other=>{if(other!==el)other.value=state[key];});
     if(['headingFont','bodyFont','headingWeight','bodyWeight','buttonWeight'].includes(key))syncWeights();
+    refreshSelectorSteps();
     update();
   }
   $$('[data-key]').forEach(el=>{
@@ -173,7 +175,12 @@
   const scripts=[...new Set(C.fontCatalog.families.flatMap(row=>row[3]))].sort();
   scripts.forEach(script=>$('#font-script').append(new Option(script.split('-').map(w=>w[0]?.toUpperCase()+w.slice(1)).join(' '),script)));
   $('#catalog-snapshot').textContent=C.fontCatalog.families.length.toLocaleString()+' Google Fonts · Catalog '+C.fontCatalog.updated+' · 2 system families';
-  function previewCandidate(name){
+  function previewCandidate(name,apply=false){
+    if(apply){
+      state[fontTarget]=name;
+      if(![...$(`[data-key="${fontTarget}"]`).options].some(option=>option.value===name))populateFontSelects();
+      syncControls();update();
+    }
     candidate=name;const row=C.fontMetadata.get(name),weights=C.weightsFor(name),weight=C.nearestWeight(name,fontTarget==='headingFont'?state.headingWeight:state.bodyWeight);
     $('#font-candidate-name').textContent=name;$('#font-candidate-meta').textContent=(row?.[1]||'System / custom family')+' · '+weights.join(', ');
     $('#font-candidate-sample').textContent=$('#font-preview-text').value||'The details make the difference.';
@@ -190,10 +197,22 @@
     const rows=fontMatches(),visible=rows.slice(0,fontLimit);
     $('#font-result-count').textContent=rows.length.toLocaleString()+' families'+(rows.length>fontLimit?' · Showing '+fontLimit:'');
     $('#font-results').replaceChildren(...visible.map((row,i)=>{
-      const button=document.createElement('button');button.type='button';button.className='font-row';button.dataset.family=row[0];button.setAttribute('aria-pressed',String(candidate===row[0]));button.tabIndex=i===0?0:-1;
+      const button=document.createElement('button');button.type='button';button.className='font-row';button.dataset.family=row[0];button.setAttribute('aria-pressed',String(candidate===row[0]));button.tabIndex=(visible.some(item=>item[0]===candidate)?candidate===row[0]:i===0)?0:-1;
       const name=document.createElement('span');name.className='font-row-name';name.textContent=row[0];const meta=document.createElement('span');meta.className='font-row-meta';meta.textContent=row[1]+' · '+row[2].length+' weight'+(row[2].length===1?'':'s');
-      button.append(name,meta);button.addEventListener('click',()=>previewCandidate(row[0]));
-      button.addEventListener('keydown',event=>{const items=$$('.font-row');let next=i;if(event.key==='ArrowDown')next=Math.min(i+1,items.length-1);else if(event.key==='ArrowUp')next=Math.max(0,i-1);else if(event.key==='Home')next=0;else if(event.key==='End')next=items.length-1;else return;event.preventDefault();items.forEach((item,j)=>item.tabIndex=j===next?0:-1);items[next].focus();previewCandidate(items[next].dataset.family);});
+      button.append(name,meta);button.addEventListener('click',()=>{previewCandidate(row[0],true);$$('.font-row').forEach(item=>item.tabIndex=item===button?0:-1);});
+      button.addEventListener('keydown',event=>{
+        if(event.altKey||event.ctrlKey||event.metaKey)return;
+        let next=i;
+        if(event.key==='ArrowDown')next=Math.min(i+1,rows.length-1);
+        else if(event.key==='ArrowUp')next=Math.max(0,i-1);
+        else if(event.key==='Home')next=0;
+        else if(event.key==='End')next=rows.length-1;
+        else return;
+        event.preventDefault();
+        if(next>=fontLimit){fontLimit=Math.min(rows.length,Math.max(fontLimit+60,next+1));renderFontResults();}
+        const items=$$('.font-row');items.forEach((item,j)=>item.tabIndex=j===next?0:-1);
+        items[next].focus();previewCandidate(items[next].dataset.family,true);
+      });
       return button;
     }));
     $('#font-more').hidden=rows.length<=fontLimit;$('#font-no-results').hidden=rows.length!==0;
@@ -201,16 +220,16 @@
   }
   function openFontBrowser(target){
     fontTarget=target;candidate=state[target];fontLimit=60;$('#font-search').value='';$('#font-category').value='';$('#font-script').value='';
-    $('#font-role-label').textContent=target==='headingFont'?'HEADING FONT':'BODY FONT';$('#font-apply').innerHTML=(target==='headingFont'?'Use for headings':'Use for body text')+' '+icon('check');
+    $('#font-role-label').textContent=target==='headingFont'?'HEADING FONT':'BODY FONT';$('#font-apply').innerHTML='Done '+icon('check');
     renderFontResults();previewCandidate(candidate);$('#font-dialog').showModal();$('#font-search').focus();
   }
   $$('.browse-font').forEach(button=>button.addEventListener('click',()=>openFontBrowser(button.dataset.fontTarget)));
   ['#font-search','#font-category','#font-script','#font-sort'].forEach(id=>$(id).addEventListener(id==='#font-search'?'input':'change',()=>{fontLimit=60;renderFontResults();$('#font-results').scrollTop=0;}));
-  $('#font-search').addEventListener('keydown',event=>{if(event.key==='ArrowDown'&&$('.font-row')){event.preventDefault();$('.font-row').focus();}});
+  $('#font-search').addEventListener('keydown',event=>{if(event.key==='ArrowDown'&&$('.font-row')){event.preventDefault();$('.font-row').focus();previewCandidate($('.font-row').dataset.family,true);}});
   $('#font-more').addEventListener('click',()=>{const old=fontLimit;fontLimit+=60;renderFontResults();$$('.font-row')[old]?.focus();});
   $('#font-preview-text').addEventListener('input',()=>$('#font-candidate-sample').textContent=$('#font-preview-text').value);
-  $('#font-add-custom').addEventListener('click',()=>{const name=$('#font-search').value.trim();if(C.registerFont(name))previewCandidate(name);});
-  $('#font-apply').addEventListener('click',()=>{state[fontTarget]=candidate;if(![...$(`[data-key="${fontTarget}"]`).options].some(option=>option.value===candidate))populateFontSelects();syncControls();update();$('#font-dialog').close();toast(candidate+' applied to '+(fontTarget==='headingFont'?'headings.':'body text.'));});
+  $('#font-add-custom').addEventListener('click',()=>{const name=$('#font-search').value.trim();if(C.registerFont(name))previewCandidate(name,true);});
+  $('#font-apply').addEventListener('click',()=>$('#font-dialog').close());
   let previousImage='';
   function renderBackground() {
     const img=state.imageData||state.imageUrl;
@@ -237,7 +256,58 @@
     catch {const ta=document.createElement('textarea');ta.value=md;ta.setAttribute('aria-hidden','true');ta.style.cssText='position:fixed;opacity:0;inset:0;pointer-events:none';document.body.append(ta);ta.select();const copied=document.execCommand('copy');ta.remove();$('#copy-guide').focus();if(!copied){toast('Clipboard is unavailable here. Download the .md file instead.');return;}}
     toast('Guide copied. Paste it before your next design brief.');const button=$('#copy-guide');button.innerHTML=icon('check')+'Copied';setTimeout(()=>button.innerHTML=icon('copy')+'Copy guide',2000);
   });
-  $('#preset').addEventListener('change',()=>{state=C.clone(C.presets[$('#preset').value]);imageError=false;syncControls();update();toast('Preset applied. Your guide is ready to customize.');});
+  function applyPreset(){
+    const key=$('#preset').value;if(key===state.preset)return;
+    state=C.clone(C.presets[key]);imageError=false;syncControls();update();
+  }
+  ['input','change'].forEach(type=>$('#preset').addEventListener(type,applyPreset));
+  // Commit each keyboard step ourselves; native menus may otherwise wait for Enter.
+  function refreshSelectorSteps(){
+    $$('.selector-step').forEach(button=>{
+      const select=$('#'+button.dataset.select),next=select.selectedIndex+Number(button.dataset.direction);
+      button.disabled=next<0||next>=select.options.length;
+    });
+  }
+  function setupLiveSelector(select,label){
+    if(select.id==='preset'){
+      const wrap=document.createElement('div');wrap.className='preset-control';
+      select.replaceWith(wrap);wrap.append(select);
+    }
+    const steps=document.createElement('div');steps.className='selector-steps';steps.setAttribute('role','group');steps.setAttribute('aria-label',label+' navigation');
+    function choose(index){
+      const next=Math.max(0,Math.min(select.options.length-1,index));
+      if(next===select.selectedIndex)return;
+      select.selectedIndex=next;select.dispatchEvent(new Event('input',{bubbles:true}));
+      refreshSelectorSteps();
+    }
+    [-1,1].forEach(direction=>{
+      const button=document.createElement('button');button.type='button';button.className='selector-step';
+      button.dataset.select=select.id;button.dataset.direction=String(direction);
+      const description=(direction<0?'Previous ':'Next ')+label.toLowerCase();
+      button.setAttribute('aria-label',description);button.title=description;
+      button.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="'+(direction<0?'m5 12 5-5 5 5':'m5 8 5 5 5-5')+'"/></svg>';
+      button.addEventListener('click',()=>choose(select.selectedIndex+direction));steps.append(button);
+    });
+    select.after(steps);
+    select.setAttribute('aria-keyshortcuts','ArrowUp ArrowDown Home End');
+    select.title='Focus here, then use ↑ / ↓ to preview each '+label.toLowerCase()+'.';
+    select.addEventListener('keydown',event=>{
+      if(event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
+      let next=select.selectedIndex;
+      if(event.key==='ArrowDown')next++;
+      else if(event.key==='ArrowUp')next--;
+      else if(event.key==='Home')next=0;
+      else if(event.key==='End')next=select.options.length-1;
+      else return;
+      event.preventDefault();choose(next);
+    });
+    // Safari and native picker changes can fire change without a prior input.
+    if(select.dataset.key)select.addEventListener('change',()=>{if(select.value!==state[select.dataset.key])applyControl(select);});
+  }
+  setupLiveSelector($('#preset'),'Preset');
+  setupLiveSelector($('#heading-font'),'Heading font');
+  setupLiveSelector($('#body-font'),'Body font');
+  refreshSelectorSteps();
   $('#import-project').addEventListener('click',()=>$('#project-file').click());
   $('#project-file').addEventListener('change',async event=>{
     const file=event.target.files[0];if(!file)return;
