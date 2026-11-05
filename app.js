@@ -24,6 +24,7 @@
   $('#overlay-color').append(colorControl('overlayColor','Overlay color'));
   const presetGroups=new Map();
   Object.keys(C.presets).forEach((key,i)=>{const label=C.presetInfo[key][3]||(i<3?'Original directions':'Inspired by design systems');if(!presetGroups.has(label)){const group=document.createElement('optgroup');group.label=label;presetGroups.set(label,group);$('#preset').append(group);}presetGroups.get(label).append(new Option(String(i+1).padStart(2,'0')+' / '+C.presetInfo[key][0],key));});
+  $('#preset-count').textContent=Object.keys(C.presets).length+' presets';
   for(let i=1;i<=6;i++){
     const row=document.createElement('div');row.className='heading-size-row';
     const label=document.createElement('span');label.textContent='H'+i;row.append(label);
@@ -117,6 +118,7 @@
   function render() {
     const page=$('#preview-page'),sizes=C.typeSizes(state),mobile=C.mobileSizes(state),b=C.buttonValues(state);
     const vars={};C.palette.forEach(([key])=>vars[key==='background'?'--p-bg':'--p-'+key.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())]=state[key]);
+    vars['--p-link']=C.linkColor(state);
     Object.assign(vars,{'--p-heading-font':C.fonts[state.headingFont],'--p-body-font':C.fonts[state.bodyFont],'--body-weight':state.bodyWeight||'400','--strong-weight':C.nearestWeight(state.bodyFont,600),'--heading-weight':state.headingWeight,'--heading-line':state.headingLine,'--tracking':state.tracking+'em','--body-size':state.bodySize+'px','--body-line':state.bodyLine,'--measure':state.measure+'ch','--button-height':b.height+'px','--button-padding':b.padding+'px','--button-radius':b.radius+'px','--button-weight':state.buttonWeight,'--card-radius':state.radius+'px','--card-padding':state.cardPadding+'px','--card-border':state.cardStyle==='border'?'1px solid var(--p-border)':'0 solid transparent','--card-shadow':state.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none','--section-space':state.sectionSpace+'px','--content-width':state.contentWidth+'px','--section-bg':state.sectionBg,'--section-text':state.sectionText,'--image-position':state.imagePosition,'--grayscale':state.grayscale+'%','--image-ratio':state.imageRatio,'--focus-color':state.focusColor,'--duration':state.duration+'ms'});
     Object.assign(vars,{'--button-font-size':state.buttonTextSize+'px','--small-text-size':state.smallTextSize+'px','--card-title-size':state.cardTitleSize+'px','--card-text-size':state.cardTextSize+'px'});
     sizes.forEach((v,i)=>vars['--h'+(i+1)]=v+'px');mobile.forEach((v,i)=>vars['--mobile-h'+(i+1)]=v+'px');

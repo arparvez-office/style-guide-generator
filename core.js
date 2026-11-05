@@ -2,10 +2,11 @@
 (function (root, factory) {
   const catalog = typeof module === 'object' && module.exports ? require('./fonts.js') : root.GoogleFontsCatalog;
   const templates = typeof module === 'object' && module.exports ? require('./template-presets.js') : root.TemplatePresets;
-  const api = factory(catalog,templates);
+  const websites = typeof module === 'object' && module.exports ? require('./website-presets.js') : root.WebsitePresets;
+  const api = factory(catalog,templates,websites);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.StyleCore = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (catalog,templates) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (catalog,templates,websites) {
   'use strict';
   const fonts = {
     'Inter Tight': '"Inter Tight", Arial, sans-serif',
@@ -89,7 +90,7 @@
     warm:['Warm editorial','Original','Warm neutrals, restrained type, and considered spacing.'],swiss:['Swiss precision','Original','A direct typographic grid with square components.'],night:['After hours','Original','Calm dark surfaces with warm highlights.'],
     shadcn:['shadcn · Neutral','shadcn/ui','Neutral semantic tokens and practical components.'],apple:['Apple · Clarity','Apple','System type, generous space, and clear product hierarchy.'],google:['Google · Material','Google Material Design','Rounded components, tonal surfaces, and clear color roles.'],webflow:['Webflow · Canvas','Webflow','Bold type, electric blue, and a deliberate studio grid.'],atlassian:['Atlassian · Teamwork','Atlassian','Task clarity, compact rhythm, and dependable blue actions.'],shopify:['Shopify · Merchant','Shopify Polaris','Calm commerce surfaces and practical, compact controls.'],wordpress:['WordPress · Publisher','WordPress','Editorial serif headings with familiar publishing controls.'],figma:['Figma · Playground','Figma','Expressive typography and a warm, collaborative canvas.'],claude:['Claude · Thoughtful','Claude','Warm paper, serif headings, and restrained terracotta.'],linear:['Linear · Focus','Linear','A precise dark workspace with fine borders.'],notion:['Notion · Paper','Notion','Content-led blocks and quiet, flexible surfaces.'],stripe:['Stripe · Commerce','Stripe','Crisp financial hierarchy and considered color.']
   };
-  (templates||[]).forEach(item=>{presets[item.key]={...warm,...item.values,preset:item.key};presetInfo[item.key]=[item.label,item.source,item.description,item.group,item.url];});
+  [...(templates||[]),...(websites||[])].forEach(item=>{presets[item.key]={...warm,...item.values,preset:item.key};presetInfo[item.key]=[item.label,item.source,item.description,item.group,item.url];});
   const mobileLimits=[44,36,30,26,22,20];
   function scaleSizes(s,legacy=false) {return Array.from({length:6},(_,i)=>Math.max(legacy?Math.max(s.bodySize+2,18):8,Math.round(s.h1/s.scale**i)));}
   function fillNewDefaults(s) {
@@ -152,6 +153,9 @@
     function lum(hex) {const rgb=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
     const la=lum(a),lb=lum(b);return (Math.max(la,lb)+.05)/(Math.min(la,lb)+.05);
   }
+  // Bright brand fills can be suitable for buttons with dark labels while
+  // remaining unsuitable for body links on a light canvas.
+  function linkColor(s) {return contrast(s.primary,s.background)>=4.5?s.primary:s.text;}
   function typeSizes(s) {const scaled=scaleSizes(s,true);return Array.from({length:6},(_,i)=>Number.isFinite(s['h'+(i+1)])?s['h'+(i+1)]:scaled[i]);}
   function mobileSizes(s) {return typeSizes(s).map((v,i)=>Number.isFinite(s['h'+(i+1)+'Mobile'])?s['h'+(i+1)+'Mobile']:Math.min(v,Math.max(s.bodySize+2,mobileLimits[i])));}
   function buttonValues(s) {return {height:{compact:40,regular:48,large:56}[s.buttonSize],padding:{compact:16,regular:22,large:28}[s.buttonSize],radius:Number.isFinite(s.buttonRadius)?s.buttonRadius:{pill:999,rounded:8,square:0,custom:8}[s.buttonShape]};}
@@ -160,7 +164,7 @@
   const ruleLines = value => value.split('\n').map(x=>x.trim()).filter(Boolean).map(x=>'- '+x.replace(/^[-*]\s*/,'')).join('\n');
   function cssTokens(s) {
     const sizes=typeSizes(s),mobile=mobileSizes(s),b=buttonValues(s);
-    const list=[...palette.map(([k])=>[`color-${k.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())}`,s[k]]),
+    const list=[...palette.map(([k])=>[`color-${k.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())}`,s[k]]),['color-link',linkColor(s)],
       ['font-heading',fonts[s.headingFont]],['font-body',fonts[s.bodyFont]],
       ...sizes.map((v,i)=>[`text-h${i+1}`,`${v}px`]),...mobile.map((v,i)=>[`text-h${i+1}-mobile`,`${v}px`]),
       ['text-body',`${s.bodySize}px`],['body-weight',s.bodyWeight||'400'],['heading-weight',s.headingWeight],['heading-line-height',s.headingLine],['heading-tracking',s.tracking+'em'],['body-line-height',s.bodyLine],['reading-width',s.measure+'ch'],
@@ -174,7 +178,7 @@
     const sizes=typeSizes(s),mobile=mobileSizes(s),b=buttonValues(s);
     const n=mdInline(s.name),image=s.imageData?`Uploaded asset: ${mdInline(s.imageName || 'background image')}. Attach this image separately; it is not embedded in this Markdown.`:s.imageUrl?`Image URL: ${mdInline(s.imageUrl)}`:'No image selected. The preview uses a CSS composition as an image-treatment sample; it is not a photography reference.';
     const imageWords={natural:'Natural light, quiet compositions, believable textures; avoid artificial gloss.',editorial:'Editorial photography, deliberate crops, a clear focal point, and consistent art direction.',graphic:'Graphic objects and strong silhouettes; purposeful geometry with clean compositions.',documentary:'Candid, authentic documentary photography with believable settings and natural human detail.'};
-    const checks=[['Text / background',s.text,s.background],['Muted / background',s.muted,s.background],['Button label / primary',s.onPrimary,s.primary],['Text / surface',s.text,s.surface],['Primary link / background',s.primary,s.background],['Focus / background',s.focusColor,s.background]];
+    const checks=[['Text / background',s.text,s.background],['Muted / background',s.muted,s.background],['Button label / primary',s.onPrimary,s.primary],['Text / surface',s.text,s.surface],['Link / background',linkColor(s),s.background],['Focus / background',s.focusColor,s.background]];
     const warnings=checks.filter(([,a,c],i)=>contrast(a,c)<(i===5?3:4.5));
     const checkRows=checks.map(([label,a,c],i)=>{const ratio=contrast(a,c),limit=i===5?3:4.5;return `| ${label} | ${ratio.toFixed(2)}:1 | ${ratio>=limit?'Pass':'Needs adjustment'} (${limit}:1) |`;}).join('\n');
     return `# ${n} — UI style guide
@@ -202,11 +206,12 @@ ${ruleLines(s.avoidRules) || '- Avoid decoration that has no purpose.'}
 
 | Semantic role | Hex | Usage |
 | --- | --- | --- |
-${palette.map(([key,label])=>`| ${label} | ${s[key]} | ${{background:'Default page canvas',surface:'Cards and elevated content',text:'Headings and essential copy',muted:'Supporting text; never reduce opacity further',primary:'Primary actions, meaningful emphasis, links',onPrimary:'Text and icons on primary fill',border:'Subtle decorative dividers and surface edges'}[key]} |`).join('\n')}
+${palette.map(([key,label])=>`| ${label} | ${s[key]} | ${{background:'Default page canvas',surface:'Cards and elevated content',text:'Headings and essential copy',muted:'Supporting text; never reduce opacity further',primary:'Primary action fills and meaningful emphasis',onPrimary:'Text and icons on primary fill',border:'Subtle decorative dividers and surface edges'}[key]} |`).join('\n')}
 
 - Use semantic roles consistently. Do not introduce arbitrary hex values.
 - Border is a decorative token. Essential input outlines and state indicators need at least 3:1 contrast against adjacent colors; use an adjusted text/focus token where necessary.
 - Link color alone is insufficient; keep links underlined in body copy.
+- Body link color: ${linkColor(s)}. Use primary when it reaches 4.5:1 on the page background; otherwise use the text token. This keeps bright action fills separate from readable body links without introducing another palette color.
 
 ### Contrast audit
 
@@ -250,7 +255,7 @@ These sizes are exact user choices, not a requirement to use every heading level
 - Font: body family, ${s.buttonTextSize}px, weight ${s.buttonWeight}, line-height 1.3.
 - Primary: fill ${s.primary}, label ${s.onPrimary}, transparent 1px border.
 - Secondary: transparent fill, text ${s.text}, 1px ${s.border} border. Its text communicates the action; strengthen the border if needed to identify the control.
-- Text action: transparent, color ${s.primary}; no decorative container. Preserve an accessible hit area and a clear label.
+- Text action: transparent, color ${linkColor(s)} (the readable link token); no decorative container. Preserve an accessible hit area and a clear label.
 - Trailing arrow: ${s.buttonArrow?'enabled; a small 25px circular detail in 14% currentColor with a decorative 15px arrow. Keep a clear accessible text label.':'disabled; use clear text labels without a trailing circle.'}
 - Hover: ${{lift:'translateY(-2px); retain the fill and label colors.',tone:'brightness(0.87); verify the resulting label contrast.',none:'no motion or color transformation; keep a clear focus and pressed state.'}[s.buttonHover]}
 - Pressed: return to translateY(0); do not remove the label.
@@ -304,5 +309,5 @@ Use the mobile heading tokens at ≤600px content width via a container query or
 Generated with Styleguide Studio · Project schema v1. This is a visual specification, not a finished accessibility certification.
 `;
   }
-  return {fonts,fontCatalog,fontMetadata,validFontName,registerFont,weightsFor,nearestWeight,fontUrl,palette,presets,presetInfo,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,scaleSizes,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
+  return {fonts,fontCatalog,fontMetadata,validFontName,registerFont,weightsFor,nearestWeight,fontUrl,palette,presets,presetInfo,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,linkColor,scaleSizes,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
 });

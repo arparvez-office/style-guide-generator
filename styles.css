@@ -179,6 +179,8 @@
 .preview-page .card-content p, .preview-page .form-card > p { font-size: var(--card-text-size,14px); }
 .preview-page .form-card label { font-size: var(--small-text-size,12px); }
 .preview-page .form-card input { font-size: var(--body-size,16px); }
+.preview-page .body-specimen a { color: var(--p-link,var(--p-primary)); }
+.preview-page .preview-button.ghost, .preview-page .form-card form > p { color: var(--p-link,var(--p-primary)); }
 .preview-page .background-content h2 { font-size: var(--h2,48px); }
 .preview-page .background-content p { font-size: var(--body-size,16px); }
 .preview-page.is-mobile .background-content h2 { font-size: var(--mobile-h2,36px); }
