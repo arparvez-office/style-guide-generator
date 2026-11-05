@@ -22,12 +22,40 @@
   C.palette.forEach(([key,label])=>$('#palette-controls').append(colorControl(key,label)));
   [['sectionBg','Base color'],['sectionEnd','Gradient end'],['sectionText','Section text']].forEach(([key,label])=>{const row=colorControl(key,label);if(key==='sectionEnd')row.dataset.show='gradient';$('#section-colors').append(row);});
   $('#overlay-color').append(colorControl('overlayColor','Overlay color'));
-  $$('.font-select').forEach(select=>Object.keys(C.fonts).forEach(name=>{const option=new Option(name,name);option.style.fontFamily=C.fonts[name];select.append(option);}));
+  const originalPresets=document.createElement('optgroup'),inspiredPresets=document.createElement('optgroup');
+  originalPresets.label='Original directions';inspiredPresets.label='Inspired by design systems';
+  Object.keys(C.presets).forEach((key,i)=>{const option=new Option(String(i+1).padStart(2,'0')+' / '+C.presetInfo[key][0],key);(i<3?originalPresets:inspiredPresets).append(option);});
+  $('#preset').append(originalPresets,inspiredPresets);
+  function populateFontSelects(){
+    const names=Object.keys(C.fonts).sort((a,b)=>a.localeCompare(b));
+    $$('.font-select').forEach(select=>{const oldValue=select.value;select.replaceChildren(...names.map(name=>new Option(name,name)));select.value=oldValue;});
+  }
+  populateFontSelects();
+  $('#font-catalog-note').textContent=C.fontCatalog.families.length.toLocaleString()+' Google Fonts + 2 system families. Use the search button to browse.';
+  function syncWeights(){
+    for(const [key,font] of [['headingWeight',state.headingFont],['bodyWeight',state.bodyFont],['buttonWeight',state.bodyFont]]){
+      state[key]=C.nearestWeight(font,state[key]||400);
+      const el=$(`[data-key="${key}"]`);el.replaceChildren(...C.weightsFor(font).map(weight=>new Option(String(weight),String(weight))));el.value=state[key];
+    }
+  }
+  function syncPresetNote(){const info=C.presetInfo[state.preset];$('#preset-note').textContent=info[2]+(info[1]==='Original'?'':' Inspired direction; fully editable.');}
+  function setTheme(theme,save=false){
+    const dark=theme==='dark';document.documentElement.dataset.theme=theme;
+    $('#theme-toggle').innerHTML=icon(dark?'moon':'sun')+'<span>'+(dark?'Dark':'Light')+'</span>';
+    $('#theme-toggle').setAttribute('aria-pressed',String(dark));$('#theme-toggle').title='Switch to '+(dark?'light':'dark')+' mode';
+    $('meta[name="theme-color"]').content=dark?'#20211f':'#f7f7f2';
+    if(save){try{localStorage.setItem('styleguide-studio-theme',theme);}catch{toast('Theme changed for this session. Browser storage is unavailable.');}}
+  }
+  setTheme(document.documentElement.dataset.theme||'dark');
+  $('#theme-toggle').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark',true));
   const controlLabels={headingFont:'Heading font',bodyFont:'Body font',h1:'H1 size',scale:'Type scale',headingWeight:'Heading weight',headingLine:'Heading line height',tracking:'Heading letter spacing',bodySize:'Body size in pixels',bodyLine:'Body line height',measure:'Reading width',radius:'Card corner radius',cardPadding:'Card padding',sectionSpace:'Section space',gradientAngle:'Gradient direction',grayscale:'Grayscale',overlayOpacity:'Overlay opacity'};
   $$('[data-key]').forEach(el=>{if(controlLabels[el.dataset.key])el.setAttribute('aria-label',controlLabels[el.dataset.key]);});
   function syncControls() {
+    if($$('.font-select').some(select=>![...select.options].some(option=>option.value===state[select.dataset.key])))populateFontSelects();
+    syncWeights();
     $$('[data-key]').forEach(el=>{const value=state[el.dataset.key];if(el.type==='checkbox')el.checked=value;else el.value=value;el.removeAttribute('aria-invalid');});
     $('#preset').value=state.preset;
+    syncPresetNote();
   }
   function persist() {
     clearTimeout(saveTimer);
@@ -54,7 +82,9 @@
       value=C.safeUrl(value);state.imageData='';state.imageName='';imageError=false;
     }
     if(typeof value==='string'&&el.maxLength>0)value=value.slice(0,el.maxLength);
-    state[key]=value;el.removeAttribute('aria-invalid');if(C.isColor(value))setColorUI(key);update();
+    state[key]=value;el.removeAttribute('aria-invalid');if(C.isColor(value))setColorUI(key);
+    if(['headingFont','bodyFont','headingWeight','bodyWeight','buttonWeight'].includes(key))syncWeights();
+    update();
   }
   $$('[data-key]').forEach(el=>{
     const type=el.type;
@@ -77,10 +107,11 @@
   function render() {
     const page=$('#preview-page'),sizes=C.typeSizes(state),mobile=C.mobileSizes(state),b=C.buttonValues(state);
     const vars={};C.palette.forEach(([key])=>vars[key==='background'?'--p-bg':'--p-'+key.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())]=state[key]);
-    Object.assign(vars,{'--p-heading-font':C.fonts[state.headingFont],'--p-body-font':C.fonts[state.bodyFont],'--heading-weight':state.headingWeight,'--heading-line':state.headingLine,'--tracking':state.tracking+'em','--body-size':state.bodySize+'px','--body-line':state.bodyLine,'--measure':state.measure+'ch','--button-height':b.height+'px','--button-padding':b.padding+'px','--button-radius':b.radius+'px','--button-weight':state.buttonWeight,'--card-radius':state.radius+'px','--card-padding':state.cardPadding+'px','--card-border':state.cardStyle==='border'?'1px solid var(--p-border)':'0 solid transparent','--card-shadow':state.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none','--section-space':state.sectionSpace+'px','--content-width':state.contentWidth+'px','--section-bg':state.sectionBg,'--section-text':state.sectionText,'--image-position':state.imagePosition,'--grayscale':state.grayscale+'%','--image-ratio':state.imageRatio,'--focus-color':state.focusColor,'--duration':state.duration+'ms'});
+    Object.assign(vars,{'--p-heading-font':C.fonts[state.headingFont],'--p-body-font':C.fonts[state.bodyFont],'--body-weight':state.bodyWeight||'400','--strong-weight':C.nearestWeight(state.bodyFont,600),'--heading-weight':state.headingWeight,'--heading-line':state.headingLine,'--tracking':state.tracking+'em','--body-size':state.bodySize+'px','--body-line':state.bodyLine,'--measure':state.measure+'ch','--button-height':b.height+'px','--button-padding':b.padding+'px','--button-radius':b.radius+'px','--button-weight':state.buttonWeight,'--card-radius':state.radius+'px','--card-padding':state.cardPadding+'px','--card-border':state.cardStyle==='border'?'1px solid var(--p-border)':'0 solid transparent','--card-shadow':state.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none','--section-space':state.sectionSpace+'px','--content-width':state.contentWidth+'px','--section-bg':state.sectionBg,'--section-text':state.sectionText,'--image-position':state.imagePosition,'--grayscale':state.grayscale+'%','--image-ratio':state.imageRatio,'--focus-color':state.focusColor,'--duration':state.duration+'ms'});
     sizes.forEach((v,i)=>vars['--h'+(i+1)]=v+'px');mobile.forEach((v,i)=>vars['--mobile-h'+(i+1)]=v+'px');
     Object.entries(vars).forEach(([key,value])=>page.style.setProperty(key,value));
     page.dataset.arrow=state.buttonArrow;page.dataset.hover=state.buttonHover;
+    page.style.colorScheme=C.contrast(state.background,'#ffffff')>7?'dark':'light';
     $('#preview-name').textContent=state.name;$('#footer-name').textContent=state.name;
     for(const [key] of C.palette)setColorUI(key);
     for(const key of ['sectionBg','sectionEnd','sectionText','overlayColor'])setColorUI(key);
@@ -91,7 +122,7 @@
     const contrasts=[['#text-contrast',state.text,state.background],['#button-contrast',state.onPrimary,state.primary],['#muted-contrast',state.muted,state.background]];
     contrasts.forEach(([id,a,c])=>{const ratio=C.contrast(a,c),pass=ratio>=4.5;$(id).textContent=ratio.toFixed(2)+':1 '+(pass?'✓':'!');$(id).classList.toggle('fail',!pass);$(id).setAttribute('aria-label',ratio.toFixed(2)+' to 1, '+(pass?'passes':'fails')+' WCAG AA normal text');});
     $('#palette-swatches').replaceChildren(...C.palette.map(([key,label,short])=>{const el=document.createElement('div');el.className='palette-swatch';const chip=document.createElement('div');chip.className='chip';chip.style.setProperty('--chip',state[key]);chip.setAttribute('aria-label',label+' '+state[key]);const name=document.createElement('strong');name.textContent=short;const hex=document.createElement('code');hex.textContent=state[key].toUpperCase();el.append(chip,name,hex);return el;}));
-    $('#type-meta').replaceChildren(...['Headings / '+state.headingFont+' '+state.headingWeight,'Body / '+state.bodyFont+' 400'].map(t=>{const el=document.createElement('span');el.textContent=t;return el;}));
+    $('#type-meta').replaceChildren(...['Headings / '+state.headingFont+' '+state.headingWeight,'Body / '+state.bodyFont+' '+state.bodyWeight].map(t=>{const el=document.createElement('span');el.textContent=t;return el;}));
     const words=['A clear point of view.','Make room for ideas.','Good things, considered.','Every detail matters.','Simple. Useful. Human.','A little more intention.'];
     $('#type-specimens').replaceChildren(...sizes.map((size,i)=>{const row=document.createElement('div');row.className='type-specimen';const label=document.createElement('span');label.className='type-name';label.textContent='H'+(i+1);const heading=document.createElement('h'+(i+1));heading.textContent=words[i];const detail=document.createElement('span');detail.className='type-size';detail.textContent=size+' / '+state.headingWeight;row.append(label,heading,detail);return row;}));
     const steps=[1,2,3,4,6,8].map(x=>x*state.spacing);
@@ -100,7 +131,73 @@
     renderBackground();
     const md=C.markdown(state);$('#markdown-code').textContent=md;$('#markdown-filename').textContent=C.filename(state)+'.md';$('#markdown-count').textContent=md.split('\n').length+' lines';
     $('#guide-summary').textContent=new Set([state.headingFont,state.bodyFont]).size+' fonts · 7 colors · 1 clear direction';
+    ensurePreviewFonts();
   }
+  const fontLoads=new Map();
+  function loadFont(name,weights){
+    const url=C.fontUrl(name,weights);if(!url)return Promise.resolve(true);
+    if(fontLoads.has(url))return fontLoads.get(url);
+    const promise=new Promise(resolve=>{
+      const link=document.createElement('link');link.rel='stylesheet';link.href=url;link.dataset.fontFamily=name;
+      let finished=false;
+      const finish=success=>{if(finished)return;finished=true;clearTimeout(timer);resolve(success);};
+      const timer=setTimeout(()=>finish(false),15000);
+      link.onload=()=>{const safeFamily=JSON.stringify(name),weight=C.nearestWeight(name,weights[0]||400);if(document.fonts)document.fonts.load(weight+' 24px '+safeFamily).then(()=>finish(true),()=>finish(false));else finish(true);};
+      link.onerror=()=>finish(false);document.head.append(link);
+    });fontLoads.set(url,promise);return promise;
+  }
+  let previewFontSignature='';
+  function ensurePreviewFonts(){
+    const signature=[state.headingFont,state.bodyFont,state.headingWeight,state.bodyWeight,state.buttonWeight].join('|');if(signature===previewFontSignature)return;
+    previewFontSignature=signature;$('#font-load-status').textContent='Loading selected fonts…';
+    Promise.all([loadFont(state.headingFont,[state.headingWeight]),loadFont(state.bodyFont,[state.bodyWeight,state.buttonWeight,600])]).then(results=>{
+      if(signature!==previewFontSignature)return;
+      $('#font-load-status').textContent=results.every(Boolean)?'Selected fonts ready. Font files require an internet connection.':'A font could not load. Showing the declared fallback; reconnect and reopen to retry.';
+    });
+  }
+  let fontTarget='headingFont',candidate=state.headingFont,fontLimit=60;
+  const catalogRows=[['System sans','System',[100,200,300,400,500,600,700,800,900],[],0],['Georgia','System',[400,700],[],1],...C.fontCatalog.families];
+  const scripts=[...new Set(C.fontCatalog.families.flatMap(row=>row[3]))].sort();
+  scripts.forEach(script=>$('#font-script').append(new Option(script.split('-').map(w=>w[0]?.toUpperCase()+w.slice(1)).join(' '),script)));
+  $('#catalog-snapshot').textContent=C.fontCatalog.families.length.toLocaleString()+' Google Fonts · Catalog '+C.fontCatalog.updated+' · 2 system families';
+  function previewCandidate(name){
+    candidate=name;const row=C.fontMetadata.get(name),weights=C.weightsFor(name),weight=C.nearestWeight(name,fontTarget==='headingFont'?state.headingWeight:state.bodyWeight);
+    $('#font-candidate-name').textContent=name;$('#font-candidate-meta').textContent=(row?.[1]||'System / custom family')+' · '+weights.join(', ');
+    $('#font-candidate-sample').textContent=$('#font-preview-text').value||'The details make the difference.';
+    for(const id of ['#font-candidate-sample','#font-candidate-alphabet']){$(id).style.fontFamily=C.fonts[name];$(id).style.fontWeight=weight;}
+    $('#font-candidate-status').textContent='Loading preview…';
+    $$('.font-row').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.family===name)));
+    loadFont(name,[weight]).then(ready=>{if(candidate===name)$('#font-candidate-status').textContent=ready?'Preview ready · '+weight+' weight':'Font unavailable offline or family not found. Fallback shown.';});
+  }
+  function fontMatches(){
+    const query=$('#font-search').value.trim().toLocaleLowerCase(),category=$('#font-category').value,script=$('#font-script').value;
+    return catalogRows.filter(row=>(!query||row[0].toLocaleLowerCase().includes(query))&&(!category||row[1]===category)&&(!script||row[3].includes(script))).sort((a,b)=>$('#font-sort').value==='alpha'?a[0].localeCompare(b[0]):a[4]-b[4]||a[0].localeCompare(b[0]));
+  }
+  function renderFontResults(){
+    const rows=fontMatches(),visible=rows.slice(0,fontLimit);
+    $('#font-result-count').textContent=rows.length.toLocaleString()+' families'+(rows.length>fontLimit?' · Showing '+fontLimit:'');
+    $('#font-results').replaceChildren(...visible.map((row,i)=>{
+      const button=document.createElement('button');button.type='button';button.className='font-row';button.dataset.family=row[0];button.setAttribute('aria-pressed',String(candidate===row[0]));button.tabIndex=i===0?0:-1;
+      const name=document.createElement('span');name.className='font-row-name';name.textContent=row[0];const meta=document.createElement('span');meta.className='font-row-meta';meta.textContent=row[1]+' · '+row[2].length+' weight'+(row[2].length===1?'':'s');
+      button.append(name,meta);button.addEventListener('click',()=>previewCandidate(row[0]));
+      button.addEventListener('keydown',event=>{const items=$$('.font-row');let next=i;if(event.key==='ArrowDown')next=Math.min(i+1,items.length-1);else if(event.key==='ArrowUp')next=Math.max(0,i-1);else if(event.key==='Home')next=0;else if(event.key==='End')next=items.length-1;else return;event.preventDefault();items.forEach((item,j)=>item.tabIndex=j===next?0:-1);items[next].focus();previewCandidate(items[next].dataset.family);});
+      return button;
+    }));
+    $('#font-more').hidden=rows.length<=fontLimit;$('#font-no-results').hidden=rows.length!==0;
+    const name=$('#font-search').value.trim();$('#font-add-custom').hidden=!C.validFontName(name);$('#font-add-custom').textContent='Preview “'+name+'” by exact name';
+  }
+  function openFontBrowser(target){
+    fontTarget=target;candidate=state[target];fontLimit=60;$('#font-search').value='';$('#font-category').value='';$('#font-script').value='';
+    $('#font-role-label').textContent=target==='headingFont'?'HEADING FONT':'BODY FONT';$('#font-apply').innerHTML=(target==='headingFont'?'Use for headings':'Use for body text')+' '+icon('check');
+    renderFontResults();previewCandidate(candidate);$('#font-dialog').showModal();$('#font-search').focus();
+  }
+  $$('.browse-font').forEach(button=>button.addEventListener('click',()=>openFontBrowser(button.dataset.fontTarget)));
+  ['#font-search','#font-category','#font-script','#font-sort'].forEach(id=>$(id).addEventListener(id==='#font-search'?'input':'change',()=>{fontLimit=60;renderFontResults();$('#font-results').scrollTop=0;}));
+  $('#font-search').addEventListener('keydown',event=>{if(event.key==='ArrowDown'&&$('.font-row')){event.preventDefault();$('.font-row').focus();}});
+  $('#font-more').addEventListener('click',()=>{const old=fontLimit;fontLimit+=60;renderFontResults();$$('.font-row')[old]?.focus();});
+  $('#font-preview-text').addEventListener('input',()=>$('#font-candidate-sample').textContent=$('#font-preview-text').value);
+  $('#font-add-custom').addEventListener('click',()=>{const name=$('#font-search').value.trim();if(C.registerFont(name))previewCandidate(name);});
+  $('#font-apply').addEventListener('click',()=>{state[fontTarget]=candidate;if(![...$(`[data-key="${fontTarget}"]`).options].some(option=>option.value===candidate))populateFontSelects();syncControls();update();$('#font-dialog').close();toast(candidate+' applied to '+(fontTarget==='headingFont'?'headings.':'body text.'));});
   let previousImage='';
   function renderBackground() {
     const img=state.imageData||state.imageUrl;

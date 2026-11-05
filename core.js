@@ -1,9 +1,10 @@
 /* Pure data and Markdown generation. Works in a browser and in Node for checks. */
 (function (root, factory) {
-  const api = factory();
+  const catalog = typeof module === 'object' && module.exports ? require('./fonts.js') : root.GoogleFontsCatalog;
+  const api = factory(catalog);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.StyleCore = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (catalog) {
   'use strict';
   const fonts = {
     'Inter Tight': '"Inter Tight", Arial, sans-serif',
@@ -15,6 +16,24 @@
     'Georgia': 'Georgia, "Times New Roman", serif',
     'System sans': 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
   };
+  const fontCatalog = catalog || {updated:'',source:'',families:[]};
+  const fontMetadata = new Map(fontCatalog.families.map(row=>[row[0],row]));
+  const validFontName = name => typeof name==='string' && name.length<=160 && /^[\p{L}\p{N} .&'()-]+$/u.test(name) && name.trim().length>0;
+  function registerFont(name) {
+    if(!validFontName(name))return false;
+    if(Object.hasOwn(fonts,name))return true;
+    const category=fontMetadata.get(name)?.[1] || 'Sans Serif';
+    const fallback=category==='Serif'?'Georgia, serif':category==='Monospace'?'ui-monospace, monospace':'Arial, sans-serif';
+    fonts[name]=JSON.stringify(name)+', '+fallback;return true;
+  }
+  fontCatalog.families.forEach(([name])=>registerFont(name));
+  function weightsFor(name) {return fontMetadata.get(name)?.[2] || (['Georgia','System sans'].includes(name)?[100,200,300,400,500,600,700,800,900]:[400]);}
+  function nearestWeight(name,weight) {return String(weightsFor(name).reduce((a,b)=>Math.abs(b-Number(weight))<Math.abs(a-Number(weight))?b:a));}
+  function fontUrl(name,weights=[400]) {
+    if(['Georgia','System sans'].includes(name))return '';
+    const supported=[...new Set(weights.map(w=>Number(nearestWeight(name,w))))].sort((a,b)=>a-b);
+    return 'https://fonts.googleapis.com/css2?family='+encodeURIComponent(name).replace(/%20/g,'+')+':wght@'+supported.join(';')+'&display=swap';
+  }
   const palette = [
     ['background', 'Background', 'Page'], ['surface', 'Surface', 'Surface'],
     ['text', 'Text', 'Text'], ['muted', 'Muted text', 'Muted'],
@@ -25,7 +44,7 @@
     schemaVersion: 1, preset: 'warm', name: 'Studio North',
     intent: 'Warm, restrained interfaces for thoughtful digital products.',
     background: '#f7f7f2', surface: '#ffffff', text: '#2d2c2c', muted: '#5d5c5b', primary: '#2d2c2c', onPrimary: '#ffffff', border: '#dedbd2',
-    headingFont: 'Inter Tight', bodyFont: 'Inter', h1: 60, scale: 1.25, headingWeight: '500', headingLine: 1.15, tracking: -0.025, bodySize: 16, bodyLine: 1.6, measure: 65,
+    headingFont: 'Inter Tight', bodyFont: 'Inter', h1: 60, scale: 1.25, headingWeight: '500', headingLine: 1.15, tracking: -0.025, bodySize: 16, bodyWeight: '400', bodyLine: 1.6, measure: 65,
     buttonShape: 'pill', buttonSize: 'regular', buttonWeight: '500', buttonArrow: true, buttonHover: 'lift',
     radius: 8, cardStyle: 'border', cardPadding: 24, spacing: 8, sectionSpace: 72, contentWidth: 1120,
     backgroundStyle: 'solid', sectionBg: '#2d2c2c', sectionEnd: '#5d5c5b', sectionText: '#f7f7f2', gradientAngle: 135,
@@ -51,6 +70,24 @@
       personality: 'Calm, tactile, focused. Dark surfaces with warm, considered highlights.',
       doRules: 'Use surface elevation through subtle tonal differences.\nKeep body copy comfortably readable on dark backgrounds.\nReserve the warm highlight for primary actions.\nUse gentle borders to define edges without visual clutter.'}
   };
+  Object.assign(presets, {
+    shadcn: {...warm,preset:'shadcn',name:'Neutral UI',intent:'A practical component system with neutral surfaces and sharp, predictable interactions.',headingFont:'Geist',bodyFont:'Geist',h1:48,scale:1.2,headingWeight:'600',tracking:-0.025,headingLine:1.15,background:'#ffffff',surface:'#fafafa',text:'#171717',muted:'#656565',primary:'#171717',onPrimary:'#fafafa',border:'#e5e5e5',buttonShape:'rounded',buttonArrow:false,buttonSize:'compact',buttonHover:'tone',buttonWeight:'500',radius:8,cardPadding:24,spacing:4,sectionSpace:64,sectionBg:'#171717',sectionText:'#fafafa',focusColor:'#525252',personality:'Understated, composed, practical. Neutral surfaces and clearly defined component states.',doRules:'Use semantic foreground/background pairs consistently.\nKeep controls compact and alignment precise.\nUse subtle borders and clearly visible focus rings.\nLet content structure the page before adding decoration.'},
+    apple: {...warm,preset:'apple',name:'Clarity',intent:'Calm, spacious product experiences with a strong hierarchy and a single clear next action.',headingFont:'System sans',bodyFont:'System sans',h1:64,scale:1.25,headingWeight:'600',headingLine:1.1,tracking:-0.035,background:'#f5f5f7',surface:'#ffffff',text:'#1d1d1f',muted:'#626266',primary:'#0067cf',onPrimary:'#ffffff',border:'#d2d2d7',buttonShape:'pill',buttonArrow:false,buttonHover:'tone',radius:20,cardStyle:'flat',cardPadding:32,sectionSpace:96,sectionBg:'#1d1d1f',sectionText:'#f5f5f7',focusColor:'#0067cf',personality:'Clear, calm, refined. Product detail and useful hierarchy carry the experience.',doRules:'Put the primary task and product content first.\nUse generous whitespace with a deliberate hierarchy.\nUse a system font stack and restrained blue actions.\nKeep motion brief, purposeful, and optional.'},
+    google: {...warm,preset:'google',name:'Material Notes',intent:'A friendly, accessible interface with clear semantic roles and comfortable, tactile components.',headingFont:'Roboto',bodyFont:'Roboto',h1:57,scale:1.25,headingWeight:'400',headingLine:1.15,tracking:0,background:'#fdf8ff',surface:'#f1edf7',text:'#1d1b20',muted:'#625c69',primary:'#6750a4',onPrimary:'#ffffff',border:'#cac4d0',buttonShape:'pill',buttonArrow:false,buttonWeight:'500',buttonHover:'tone',radius:24,cardPadding:24,spacing:4,sectionSpace:64,sectionBg:'#eaddff',sectionText:'#21005d',focusColor:'#6750a4',personality:'Friendly, legible, tactile. Soft surfaces with clear semantic roles.',doRules:'Distinguish display, headline, title, body, and label roles.\nUse rounded containers with comfortable touch targets.\nKeep primary actions visually distinct from secondary surfaces.\nUse color to communicate purpose rather than decoration.'},
+    webflow: {...warm,preset:'webflow',name:'Canvas Studio',intent:'An expressive studio interface built on bold typography, disciplined grids, and electric blue actions.',headingFont:'Inter Tight',bodyFont:'Inter',h1:76,scale:1.333,headingWeight:'600',headingLine:1.05,tracking:-0.04,background:'#f6f6f6',surface:'#ffffff',text:'#171717',muted:'#5a5a5a',primary:'#1460e8',onPrimary:'#ffffff',border:'#d5d5d5',buttonShape:'square',buttonArrow:true,buttonWeight:'600',radius:0,cardStyle:'flat',cardPadding:24,sectionSpace:88,spacing:8,sectionBg:'#1460e8',sectionText:'#ffffff',focusColor:'#1460e8',personality:'Bold, deliberate, creative. Strong grids and confident scale contrast.',doRules:'Use typography to create visual energy.\nAnchor expressive sections to a consistent grid.\nUse a vivid blue accent for useful actions.\nUse sharp edges, intentional image crops, and generous section spacing.'},
+    atlassian: {...warm,preset:'atlassian',name:'Teamwork',intent:'A dependable workspace that makes tasks, progress, and next actions easy to understand.',headingFont:'Public Sans',bodyFont:'Public Sans',h1:44,scale:1.2,headingWeight:'600',headingLine:1.2,tracking:-0.02,background:'#f7f8f9',surface:'#ffffff',text:'#172b4d',muted:'#44546f',primary:'#0c66e4',onPrimary:'#ffffff',border:'#c5cbd4',buttonShape:'rounded',buttonArrow:false,buttonSize:'compact',buttonWeight:'600',buttonHover:'tone',radius:8,cardPadding:20,spacing:4,sectionSpace:56,sectionBg:'#e9f2ff',sectionText:'#09326c',focusColor:'#0c66e4',personality:'Dependable, approachable, efficient. A clear workspace for people doing real work.',doRules:'Assign colors by semantic role and interaction state.\nKeep labels direct and task focused.\nUse compact spacing where information density helps.\nKeep navigation, progress, feedback, and next actions easy to identify.'},
+    shopify: {...warm,preset:'shopify',name:'Merchant Desk',intent:'A pragmatic commerce workspace with calm surfaces, readable data, and reliable actions.',headingFont:'Inter',bodyFont:'Inter',h1:44,scale:1.2,headingWeight:'600',headingLine:1.2,tracking:-0.025,background:'#f1f1f1',surface:'#ffffff',text:'#303030',muted:'#616161',primary:'#303030',onPrimary:'#ffffff',border:'#d4d4d4',buttonShape:'rounded',buttonSize:'compact',buttonArrow:false,buttonWeight:'600',buttonHover:'tone',radius:12,cardStyle:'shadow',cardPadding:20,spacing:4,sectionSpace:56,sectionBg:'#e3f1df',sectionText:'#204523',focusColor:'#237b38',personality:'Pragmatic, calm, trustworthy. Commerce tasks without unnecessary visual noise.',doRules:'Put operational clarity and meaningful status ahead of decoration.\nUse restrained surfaces and compact, consistent components.\nUse green for positive outcomes, with text or icons reinforcing meaning.\nMake forms, totals, product information, and next actions easy to scan.'},
+    wordpress: {...warm,preset:'wordpress',name:'Open Publisher',intent:'A clear publishing interface that balances editorial typography with direct, familiar controls.',headingFont:'Source Serif 4',bodyFont:'Open Sans',h1:56,scale:1.25,headingWeight:'600',headingLine:1.15,tracking:-0.02,background:'#f0f0f1',surface:'#ffffff',text:'#1d2327',muted:'#50575e',primary:'#2271b1',onPrimary:'#ffffff',border:'#c3c4c7',buttonShape:'square',buttonArrow:false,buttonWeight:'600',buttonHover:'tone',radius:4,cardStyle:'border',cardPadding:24,spacing:4,sectionSpace:64,sectionBg:'#1d2327',sectionText:'#ffffff',focusColor:'#2271b1',personality:'Open, familiar, editorial. Content comes first; controls remain direct and useful.',doRules:'Use serif display type with a readable sans serif interface.\nKeep editor controls visually simple and clearly labeled.\nUse blue consistently for interactive actions.\nUse practical spacing and flexible content blocks.'},
+    figma: {...warm,preset:'figma',name:'Playground',intent:'An energetic, collaborative design canvas with expressive type and a useful component foundation.',headingFont:'Space Grotesk',bodyFont:'Figtree',h1:68,scale:1.25,headingWeight:'600',headingLine:1.1,tracking:-0.04,background:'#fff8ee',surface:'#ffffff',text:'#242122',muted:'#625b59',primary:'#6840bc',onPrimary:'#ffffff',border:'#d7cbbf',buttonShape:'rounded',buttonArrow:true,buttonWeight:'600',buttonHover:'lift',radius:16,cardStyle:'border',cardPadding:24,spacing:8,sectionSpace:80,sectionBg:'#f7d78c',sectionText:'#382c17',focusColor:'#6840bc',personality:'Expressive, playful, collaborative. Confident shapes and a useful grid.',doRules:'Balance expressive typography with readable product content.\nUse warm surfaces with one purposeful interactive accent.\nUse shape and composition to express personality.\nKeep editing tools and essential navigation predictable.'},
+    claude: {...warm,preset:'claude',name:'Thoughtful',intent:'A warm reading and writing environment with comfortable typography and restrained terracotta accents.',headingFont:'Lora',bodyFont:'DM Sans',h1:56,scale:1.25,headingWeight:'400',headingLine:1.2,tracking:-0.025,background:'#faf9f5',surface:'#ffffff',text:'#30302e',muted:'#68665f',primary:'#a7472b',onPrimary:'#ffffff',border:'#dedbd2',buttonShape:'rounded',buttonArrow:false,buttonWeight:'500',buttonHover:'tone',radius:12,cardPadding:28,measure:62,sectionSpace:80,sectionBg:'#eae5db',sectionText:'#30302e',focusColor:'#a7472b',personality:'Warm, reflective, literate. Comfortable reading and a quiet visual presence.',doRules:'Pair expressive serif headings with a readable sans serif body.\nUse warm paper tones and restrained terracotta actions.\nFavor prose, clear grouping, and generous reading space.\nKeep supporting controls subtle and feedback humane.'},
+    linear: {...warm,preset:'linear',name:'Focus',intent:'A focused dark workspace with fine borders, compact controls, and clear information hierarchy.',headingFont:'Inter',bodyFont:'Inter',h1:52,scale:1.25,headingWeight:'500',headingLine:1.1,tracking:-0.035,background:'#151619',surface:'#1d1e23',text:'#f1f2f4',muted:'#aaaeb8',primary:'#a8afff',onPrimary:'#181a30',border:'#363842',buttonShape:'rounded',buttonArrow:false,buttonSize:'compact',buttonWeight:'500',buttonHover:'tone',radius:8,cardPadding:20,spacing:4,sectionSpace:64,sectionBg:'#22242e',sectionText:'#f1f2f4',focusColor:'#a8afff',personality:'Focused, precise, fast. A quiet dark canvas with a clear hierarchy.',doRules:'Use tonal elevation rather than decorative effects.\nKeep controls compact and frequently used actions close.\nUse fine borders and highly readable text.\nReserve the accent for active states and meaningful actions.'},
+    notion: {...warm,preset:'notion',name:'Paper Blocks',intent:'A flexible, content-led workspace that feels direct, familiar, and easy to organize.',headingFont:'System sans',bodyFont:'System sans',h1:48,scale:1.25,headingWeight:'700',headingLine:1.15,tracking:-0.03,background:'#ffffff',surface:'#f7f7f5',text:'#37352f',muted:'#67665f',primary:'#37352f',onPrimary:'#ffffff',border:'#e3e2df',buttonShape:'rounded',buttonArrow:false,buttonSize:'compact',buttonWeight:'500',buttonHover:'tone',radius:4,cardStyle:'flat',cardPadding:20,spacing:4,sectionSpace:64,sectionBg:'#f1f1ef',sectionText:'#37352f',focusColor:'#326fa4',personality:'Direct, flexible, familiar. A clean sheet for useful content.',doRules:'Build content from clear, flexible blocks.\nUse simple type hierarchy and subtle separators.\nKeep surfaces quiet and controls direct.\nLet writing, structure, and meaningful content carry the page.'},
+    stripe: {...warm,preset:'stripe',name:'Clear Commerce',intent:'A polished financial product interface with crisp typography, trusted color, and precise information design.',headingFont:'Plus Jakarta Sans',bodyFont:'Inter',h1:64,scale:1.25,headingWeight:'600',headingLine:1.1,tracking:-0.035,background:'#f6f9fc',surface:'#ffffff',text:'#0a2540',muted:'#425466',primary:'#5545d9',onPrimary:'#ffffff',border:'#d6e1eb',buttonShape:'rounded',buttonArrow:true,buttonWeight:'600',buttonHover:'lift',radius:12,cardStyle:'shadow',cardPadding:28,spacing:8,sectionSpace:88,sectionBg:'#0a2540',sectionText:'#ffffff',focusColor:'#5545d9',personality:'Precise, confident, considered. Financial information made clear and approachable.',doRules:'Use strong information hierarchy and clear numeric formatting.\nUse a structured grid with confident type scale.\nUse navy for trust and one purposeful accent for actions.\nKeep technical and financial details readable and easy to verify.'}
+  });
+  const presetInfo = {
+    warm:['Warm editorial','Original','Warm neutrals, restrained type, and considered spacing.'],swiss:['Swiss precision','Original','A direct typographic grid with square components.'],night:['After hours','Original','Calm dark surfaces with warm highlights.'],
+    shadcn:['shadcn · Neutral','shadcn/ui','Neutral semantic tokens and practical components.'],apple:['Apple · Clarity','Apple','System type, generous space, and clear product hierarchy.'],google:['Google · Material','Google Material Design','Rounded components, tonal surfaces, and clear color roles.'],webflow:['Webflow · Canvas','Webflow','Bold type, electric blue, and a deliberate studio grid.'],atlassian:['Atlassian · Teamwork','Atlassian','Task clarity, compact rhythm, and dependable blue actions.'],shopify:['Shopify · Merchant','Shopify Polaris','Calm commerce surfaces and practical, compact controls.'],wordpress:['WordPress · Publisher','WordPress','Editorial serif headings with familiar publishing controls.'],figma:['Figma · Playground','Figma','Expressive typography and a warm, collaborative canvas.'],claude:['Claude · Thoughtful','Claude','Warm paper, serif headings, and restrained terracotta.'],linear:['Linear · Focus','Linear','A precise dark workspace with fine borders.'],notion:['Notion · Paper','Notion','Content-led blocks and quiet, flexible surfaces.'],stripe:['Stripe · Commerce','Stripe','Crisp financial hierarchy and considered color.']
+  };
   const numeric = {h1:[36,88],scale:[1.15,1.333],headingLine:[1,1.6],tracking:[-.06,.04],bodySize:[14,22],bodyLine:[1.3,2],measure:[45,80],radius:[0,32],cardPadding:[16,40],spacing:[4,8],sectionSpace:[40,120],contentWidth:[960,1440],gradientAngle:[0,360],grayscale:[0,100],overlayOpacity:[0,90],duration:[0,300]};
   const enums = {preset:Object.keys(presets),headingFont:Object.keys(fonts),bodyFont:Object.keys(fonts),headingWeight:['400','500','600','700','800'],buttonShape:['pill','rounded','square'],buttonSize:['compact','regular','large'],buttonWeight:['400','500','600','700'],buttonHover:['lift','tone','none'],cardStyle:['border','shadow','flat'],backgroundStyle:['solid','gradient','image'],imagePosition:['center','top','bottom','left','right'],imageRatio:['4 / 3','16 / 9','1 / 1','3 / 4'],imageDirection:['natural','editorial','graphic','documentary'],overlayStyle:['none','solid','gradient']};
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -66,7 +103,9 @@
     for (const key of Object.keys(s)) {
       const value = input[key];
       if (value === undefined) continue;
-      if (enums[key]) { if(enums[key].includes(String(value))) s[key] = String(value); }
+      if (key==='headingFont'||key==='bodyFont') {if(registerFont(value))s[key]=value;}
+      else if (['headingWeight','bodyWeight','buttonWeight'].includes(key)) {if(/^\d{1,4}$/.test(String(value))&&Number(value)>=1&&Number(value)<=1000)s[key]=String(value);}
+      else if (enums[key]) { if(enums[key].includes(String(value))) s[key] = String(value); }
       else if (numeric[key]) { if(typeof value === 'number' && Number.isFinite(value)) s[key] = Math.min(numeric[key][1],Math.max(numeric[key][0],value)); }
       else if (isColor(s[key])) { if (isColor(value)) s[key] = value.toLowerCase(); }
       else if (key === 'buttonArrow') s[key] = value === true;
@@ -79,6 +118,9 @@
     if(![1.15,1.2,1.25,1.333].includes(s.scale)) s.scale = 1.25;
     if(![4,8].includes(s.spacing)) s.spacing = 8;
     if(![0,150,200,300].includes(s.duration)) s.duration = 200;
+    s.headingWeight=nearestWeight(s.headingFont,s.headingWeight);
+    s.bodyWeight=nearestWeight(s.bodyFont,s.bodyWeight);
+    s.buttonWeight=nearestWeight(s.bodyFont,s.buttonWeight);
     return s;
   }
   function contrast(a,b) {
@@ -96,7 +138,7 @@
     const list=[...palette.map(([k])=>[`color-${k.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())}`,s[k]]),
       ['font-heading',fonts[s.headingFont]],['font-body',fonts[s.bodyFont]],
       ...sizes.map((v,i)=>[`text-h${i+1}`,`${v}px`]),...mobile.map((v,i)=>[`text-h${i+1}-mobile`,`${v}px`]),
-      ['text-body',`${s.bodySize}px`],['heading-weight',s.headingWeight],['heading-line-height',s.headingLine],['heading-tracking',s.tracking+'em'],['body-line-height',s.bodyLine],['reading-width',s.measure+'ch'],
+      ['text-body',`${s.bodySize}px`],['body-weight',s.bodyWeight||'400'],['heading-weight',s.headingWeight],['heading-line-height',s.headingLine],['heading-tracking',s.tracking+'em'],['body-line-height',s.bodyLine],['reading-width',s.measure+'ch'],
       ['button-height',b.height+'px'],['button-padding-x',b.padding+'px'],['button-radius',b.radius+'px'],['button-weight',s.buttonWeight],['card-radius',s.radius+'px'],['card-padding',s.cardPadding+'px'],['card-shadow',s.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none'],
       ['space-unit',s.spacing+'px'],...Array.from({length:6},(_,i)=>[`space-${i+1}`,s.spacing*[1,2,3,4,6,8][i]+'px']),
       ['section-space',s.sectionSpace+'px'],['content-width',s.contentWidth+'px'],['section-background',s.sectionBg],['section-background-end',s.sectionEnd],['section-text',s.sectionText],['gradient-angle',s.gradientAngle+'deg'],['overlay-color',s.overlayColor],['overlay-opacity',s.overlayOpacity/100],['image-grayscale',s.grayscale+'%'],['image-position',s.imagePosition],['image-ratio',s.imageRatio],['focus-color',s.focusColor],['motion-duration',s.duration+'ms']];
@@ -118,6 +160,8 @@
 ${s.intent.trim()}
 
 ${s.personality.trim()}
+
+Starting direction: ${presetInfo[s.preset]?.[0] || 'Custom'}. ${presetInfo[s.preset]?.[1]!=='Original'?'An independent interpretation inspired by '+presetInfo[s.preset]?.[1]+'; the values below are this project’s chosen specification, not official brand tokens.':'An original Studio direction, customized by this project.'}
 
 ### Do
 
@@ -150,11 +194,12 @@ ${warnings.length?'**Before shipping:** Adjust the failing pairings above. These
 - Heading family: ${fonts[s.headingFont]}.
 - Body and controls: ${fonts[s.bodyFont]}.
 - Heading weight: ${s.headingWeight}. Heading line-height: ${s.headingLine}. Tracking: ${s.tracking}em.
-- Body size: ${s.bodySize}px; weight: 400; line-height: ${s.bodyLine}; tracking: normal.
+- Body size: ${s.bodySize}px; weight: ${s.bodyWeight||'400'}; line-height: ${s.bodyLine}; tracking: normal.
 - Heading scale: ${s.scale}. Rounded to whole pixels with a ${Math.max(18,s.bodySize+2)}px minimum.
-- Comfortable reading measure: ${s.measure}ch. Body links are underlined. Strong text uses weight 600.
+- Comfortable reading measure: ${s.measure}ch. Body links are underlined. Strong text uses the nearest supported weight to 600 (${nearestWeight(s.bodyFont,600)}).
 - Small text: ${Math.max(12,s.bodySize*.75)}px minimum; keep important instructions at body size.
 - Load the chosen families through Google Fonts or a licensed local source. Use the declared fallback stacks when fonts are unavailable. Do not substitute a new visual style silently.
+${[...new Set([s.headingFont,s.bodyFont])].map(name=>[name,fontUrl(name,[s.headingWeight,s.bodyWeight||400,s.buttonWeight,600])]).filter(([,url])=>url).map(([name,url])=>'- Google Fonts stylesheet: ['+mdInline(name)+']('+url+')').join('\n')}
 
 | Level | Desktop size | Mobile size (≤600px content width) | Weight | Line height | Letter spacing |
 | --- | --- | --- | --- | --- | --- |
@@ -232,5 +277,5 @@ Use the mobile heading tokens at ≤600px content width via a container query or
 Generated with Styleguide Studio · Project schema v1. This is a visual specification, not a finished accessibility certification.
 `;
   }
-  return {fonts,palette,presets,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
+  return {fonts,fontCatalog,fontMetadata,validFontName,registerFont,weightsFor,nearestWeight,fontUrl,palette,presets,presetInfo,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
 });
