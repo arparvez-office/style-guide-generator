@@ -1,10 +1,11 @@
 /* Pure data and Markdown generation. Works in a browser and in Node for checks. */
 (function (root, factory) {
   const catalog = typeof module === 'object' && module.exports ? require('./fonts.js') : root.GoogleFontsCatalog;
-  const api = factory(catalog);
+  const templates = typeof module === 'object' && module.exports ? require('./template-presets.js') : root.TemplatePresets;
+  const api = factory(catalog,templates);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.StyleCore = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (catalog) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (catalog,templates) {
   'use strict';
   const fonts = {
     'Inter Tight': '"Inter Tight", Arial, sans-serif',
@@ -88,8 +89,28 @@
     warm:['Warm editorial','Original','Warm neutrals, restrained type, and considered spacing.'],swiss:['Swiss precision','Original','A direct typographic grid with square components.'],night:['After hours','Original','Calm dark surfaces with warm highlights.'],
     shadcn:['shadcn · Neutral','shadcn/ui','Neutral semantic tokens and practical components.'],apple:['Apple · Clarity','Apple','System type, generous space, and clear product hierarchy.'],google:['Google · Material','Google Material Design','Rounded components, tonal surfaces, and clear color roles.'],webflow:['Webflow · Canvas','Webflow','Bold type, electric blue, and a deliberate studio grid.'],atlassian:['Atlassian · Teamwork','Atlassian','Task clarity, compact rhythm, and dependable blue actions.'],shopify:['Shopify · Merchant','Shopify Polaris','Calm commerce surfaces and practical, compact controls.'],wordpress:['WordPress · Publisher','WordPress','Editorial serif headings with familiar publishing controls.'],figma:['Figma · Playground','Figma','Expressive typography and a warm, collaborative canvas.'],claude:['Claude · Thoughtful','Claude','Warm paper, serif headings, and restrained terracotta.'],linear:['Linear · Focus','Linear','A precise dark workspace with fine borders.'],notion:['Notion · Paper','Notion','Content-led blocks and quiet, flexible surfaces.'],stripe:['Stripe · Commerce','Stripe','Crisp financial hierarchy and considered color.']
   };
-  const numeric = {h1:[36,88],scale:[1.15,1.333],headingLine:[1,1.6],tracking:[-.06,.04],bodySize:[14,22],bodyLine:[1.3,2],measure:[45,80],radius:[0,32],cardPadding:[16,40],spacing:[4,8],sectionSpace:[40,120],contentWidth:[960,1440],gradientAngle:[0,360],grayscale:[0,100],overlayOpacity:[0,90],duration:[0,300]};
+  (templates||[]).forEach(item=>{presets[item.key]={...warm,...item.values,preset:item.key};presetInfo[item.key]=[item.label,item.source,item.description,item.group,item.url];});
+  const mobileLimits=[44,36,30,26,22,20];
+  function scaleSizes(s,legacy=false) {return Array.from({length:6},(_,i)=>Math.max(legacy?Math.max(s.bodySize+2,18):8,Math.round(s.h1/s.scale**i)));}
+  function fillNewDefaults(s) {
+    const scaled=scaleSizes(s,true);
+    for(let i=1;i<=6;i++){
+      if(!Number.isFinite(s['h'+i]))s['h'+i]=scaled[i-1];
+      if(!Number.isFinite(s['h'+i+'Mobile']))s['h'+i+'Mobile']=Math.min(s['h'+i],Math.max(s.bodySize+2,mobileLimits[i-1]));
+    }
+    if(!Number.isFinite(s.buttonRadius))s.buttonRadius={pill:999,rounded:8,square:0,custom:8}[s.buttonShape]??8;
+    s.buttonShape=s.buttonRadius===0?'square':s.buttonRadius===8?'rounded':s.buttonRadius===999?'pill':'custom';
+    if(!Number.isFinite(s.buttonTextSize))s.buttonTextSize=Math.round(s.bodySize*.875*2)/2;
+    if(!Number.isFinite(s.cardTitleSize))s.cardTitleSize=26;
+    if(!Number.isFinite(s.cardTextSize))s.cardTextSize=Math.round(s.bodySize*.875*2)/2;
+    if(!Number.isFinite(s.smallTextSize))s.smallTextSize=Math.max(12,Math.round(s.bodySize*.75*2)/2);
+    return s;
+  }
+  Object.values(presets).forEach(preset=>{fillNewDefaults(preset);preset.headingWeight=nearestWeight(preset.headingFont,preset.headingWeight);preset.bodyWeight=nearestWeight(preset.bodyFont,preset.bodyWeight);preset.buttonWeight=nearestWeight(preset.bodyFont,preset.buttonWeight);});
+  const numeric = {h1:[8,200],scale:[1.15,1.333],headingLine:[1,1.6],tracking:[-.06,.04],bodySize:[8,40],smallTextSize:[8,40],buttonTextSize:[8,40],cardTitleSize:[8,96],cardTextSize:[8,40],buttonRadius:[0,999],bodyLine:[1.3,2],measure:[45,80],radius:[0,128],cardPadding:[16,40],spacing:[4,8],sectionSpace:[40,120],contentWidth:[960,1440],gradientAngle:[0,360],grayscale:[0,100],overlayOpacity:[0,90],duration:[0,300]};
+  for(let i=1;i<=6;i++){numeric['h'+i]=[8,200];numeric['h'+i+'Mobile']=[8,160];}
   const enums = {preset:Object.keys(presets),headingFont:Object.keys(fonts),bodyFont:Object.keys(fonts),headingWeight:['400','500','600','700','800'],buttonShape:['pill','rounded','square'],buttonSize:['compact','regular','large'],buttonWeight:['400','500','600','700'],buttonHover:['lift','tone','none'],cardStyle:['border','shadow','flat'],backgroundStyle:['solid','gradient','image'],imagePosition:['center','top','bottom','left','right'],imageRatio:['4 / 3','16 / 9','1 / 1','3 / 4'],imageDirection:['natural','editorial','graphic','documentary'],overlayStyle:['none','solid','gradient']};
+  enums.buttonShape.push('custom');
   const clone = value => JSON.parse(JSON.stringify(value));
   const isColor = value => typeof value === 'string' && /^#[\da-f]{6}$/i.test(value);
   function safeUrl(value) {
@@ -121,15 +142,19 @@
     s.headingWeight=nearestWeight(s.headingFont,s.headingWeight);
     s.bodyWeight=nearestWeight(s.bodyFont,s.bodyWeight);
     s.buttonWeight=nearestWeight(s.bodyFont,s.buttonWeight);
+    // Older projects stored only H1/scale and a shape name. Derive the missing
+    // explicit values from those choices instead of silently using warm defaults.
+    const newKeys=['h2','h3','h4','h5','h6',...Array.from({length:6},(_,i)=>'h'+(i+1)+'Mobile'),'buttonRadius','buttonTextSize','cardTitleSize','cardTextSize','smallTextSize'];
+    newKeys.forEach(key=>{if(input[key]===undefined)delete s[key];});fillNewDefaults(s);
     return s;
   }
   function contrast(a,b) {
     function lum(hex) {const rgb=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
     const la=lum(a),lb=lum(b);return (Math.max(la,lb)+.05)/(Math.min(la,lb)+.05);
   }
-  function typeSizes(s) {return Array.from({length:6},(_,i)=>Math.max(s.bodySize+2,18,Math.round(s.h1/s.scale**i)));}
-  function mobileSizes(s) {const limits=[44,36,30,26,22,20];return typeSizes(s).map((v,i)=>Math.min(v,Math.max(s.bodySize+2,limits[i])));}
-  function buttonValues(s) {return {height:{compact:40,regular:48,large:56}[s.buttonSize],padding:{compact:16,regular:22,large:28}[s.buttonSize],radius:{pill:999,rounded:8,square:0}[s.buttonShape]};}
+  function typeSizes(s) {const scaled=scaleSizes(s,true);return Array.from({length:6},(_,i)=>Number.isFinite(s['h'+(i+1)])?s['h'+(i+1)]:scaled[i]);}
+  function mobileSizes(s) {return typeSizes(s).map((v,i)=>Number.isFinite(s['h'+(i+1)+'Mobile'])?s['h'+(i+1)+'Mobile']:Math.min(v,Math.max(s.bodySize+2,mobileLimits[i])));}
+  function buttonValues(s) {return {height:{compact:40,regular:48,large:56}[s.buttonSize],padding:{compact:16,regular:22,large:28}[s.buttonSize],radius:Number.isFinite(s.buttonRadius)?s.buttonRadius:{pill:999,rounded:8,square:0,custom:8}[s.buttonShape]};}
   const filename = s => (s.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'untitled')+'-style-guide';
   const mdInline = value => String(value).replace(/[\r\n]+/g,' ').replace(/\|/g,'\\|').replace(/`/g,"'").trim();
   const ruleLines = value => value.split('\n').map(x=>x.trim()).filter(Boolean).map(x=>'- '+x.replace(/^[-*]\s*/,'')).join('\n');
@@ -139,6 +164,7 @@
       ['font-heading',fonts[s.headingFont]],['font-body',fonts[s.bodyFont]],
       ...sizes.map((v,i)=>[`text-h${i+1}`,`${v}px`]),...mobile.map((v,i)=>[`text-h${i+1}-mobile`,`${v}px`]),
       ['text-body',`${s.bodySize}px`],['body-weight',s.bodyWeight||'400'],['heading-weight',s.headingWeight],['heading-line-height',s.headingLine],['heading-tracking',s.tracking+'em'],['body-line-height',s.bodyLine],['reading-width',s.measure+'ch'],
+      ['text-small',s.smallTextSize+'px'],['text-button',s.buttonTextSize+'px'],['text-card-title',s.cardTitleSize+'px'],['text-card-body',s.cardTextSize+'px'],
       ['button-height',b.height+'px'],['button-padding-x',b.padding+'px'],['button-radius',b.radius+'px'],['button-weight',s.buttonWeight],['card-radius',s.radius+'px'],['card-padding',s.cardPadding+'px'],['card-shadow',s.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none'],
       ['space-unit',s.spacing+'px'],...Array.from({length:6},(_,i)=>[`space-${i+1}`,s.spacing*[1,2,3,4,6,8][i]+'px']),
       ['section-space',s.sectionSpace+'px'],['content-width',s.contentWidth+'px'],['section-background',s.sectionBg],['section-background-end',s.sectionEnd],['section-text',s.sectionText],['gradient-angle',s.gradientAngle+'deg'],['overlay-color',s.overlayColor],['overlay-opacity',s.overlayOpacity/100],['image-grayscale',s.grayscale+'%'],['image-position',s.imagePosition],['image-ratio',s.imageRatio],['focus-color',s.focusColor],['motion-duration',s.duration+'ms']];
@@ -162,6 +188,7 @@ ${s.intent.trim()}
 ${s.personality.trim()}
 
 Starting direction: ${presetInfo[s.preset]?.[0] || 'Custom'}. ${presetInfo[s.preset]?.[1]!=='Original'?'An independent interpretation inspired by '+presetInfo[s.preset]?.[1]+'; the values below are this project’s chosen specification, not official brand tokens.':'An original Studio direction, customized by this project.'}
+${presetInfo[s.preset]?.[4]?'\nReference: ['+mdInline(presetInfo[s.preset][1])+']('+presetInfo[s.preset][4]+'). The chosen values remain editable.':''}
 
 ### Do
 
@@ -195,9 +222,9 @@ ${warnings.length?'**Before shipping:** Adjust the failing pairings above. These
 - Body and controls: ${fonts[s.bodyFont]}.
 - Heading weight: ${s.headingWeight}. Heading line-height: ${s.headingLine}. Tracking: ${s.tracking}em.
 - Body size: ${s.bodySize}px; weight: ${s.bodyWeight||'400'}; line-height: ${s.bodyLine}; tracking: normal.
-- Heading scale: ${s.scale}. Rounded to whole pixels with a ${Math.max(18,s.bodySize+2)}px minimum.
+- Heading sizes are independently set for H1–H6 on desktop and mobile. Scale ${s.scale} is an optional generation shortcut; changing one size must not resize the other levels.
 - Comfortable reading measure: ${s.measure}ch. Body links are underlined. Strong text uses the nearest supported weight to 600 (${nearestWeight(s.bodyFont,600)}).
-- Small text: ${Math.max(12,s.bodySize*.75)}px minimum; keep important instructions at body size.
+- Small text: ${s.smallTextSize}px. Button labels: ${s.buttonTextSize}px. Card titles: ${s.cardTitleSize}px. Card body text: ${s.cardTextSize}px. Keep important instructions comfortably readable.
 - Load the chosen families through Google Fonts or a licensed local source. Use the declared fallback stacks when fonts are unavailable. Do not substitute a new visual style silently.
 ${[...new Set([s.headingFont,s.bodyFont])].map(name=>[name,fontUrl(name,[s.headingWeight,s.bodyWeight||400,s.buttonWeight,600])]).filter(([,url])=>url).map(([name,url])=>'- Google Fonts stylesheet: ['+mdInline(name)+']('+url+')').join('\n')}
 
@@ -205,7 +232,7 @@ ${[...new Set([s.headingFont,s.bodyFont])].map(name=>[name,fontUrl(name,[s.headi
 | --- | --- | --- | --- | --- | --- |
 ${sizes.map((v,i)=>`| H${i+1} | ${v}px | ${mobile[i]}px | ${s.headingWeight} | ${s.headingLine} | ${s.tracking}em |`).join('\n')}
 
-These sizes are hierarchy tokens, not a requirement to use every level. Use one H1, then semantic heading order. Component titles may use 26px and specimen labels 23px; do not confuse a display size with document structure. On mobile, allow natural wrapping; avoid forced line breaks in product content.
+These sizes are exact user choices, not a requirement to use every heading level. Use one H1, then semantic heading order. Card titles use their separate ${s.cardTitleSize}px token; specimen section labels are part of the guide layout. On mobile, use the mobile values exactly and allow natural wrapping. Review very small sizes for readability.
 
 ## 4. Layout and spacing
 
@@ -220,7 +247,7 @@ These sizes are hierarchy tokens, not a requirement to use every level. Use one 
 
 - Shape: ${s.buttonShape}; radius: ${b.radius}px.
 - Minimum visual height: ${b.height}px; inline padding: ${b.padding}px; block padding: 10px. Maintain at least a 44×44px interaction target; expand the hit area for compact controls.
-- Font: body family, ${s.bodySize*.875}px, weight ${s.buttonWeight}, line-height 1.3.
+- Font: body family, ${s.buttonTextSize}px, weight ${s.buttonWeight}, line-height 1.3.
 - Primary: fill ${s.primary}, label ${s.onPrimary}, transparent 1px border.
 - Secondary: transparent fill, text ${s.text}, 1px ${s.border} border. Its text communicates the action; strengthen the border if needed to identify the control.
 - Text action: transparent, color ${s.primary}; no decorative container. Preserve an accessible hit area and a clear label.
@@ -237,7 +264,7 @@ These sizes are hierarchy tokens, not a requirement to use every level. Use one 
 - Card radius: ${s.radius}px. Padding: ${s.cardPadding}px. Treatment: ${s.cardStyle}.
 - Border: ${s.cardStyle==='border'?`1px solid ${s.border}`:'none'}. Shadow: ${s.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none'}.
 - Image ratio: ${s.imageRatio.replace(' / ',':')}; object-fit: cover; focal point: ${s.imagePosition}; grayscale: ${s.grayscale}%; clip image to card edges.
-- Card title example: 26px in heading family. Card text: ${s.bodySize*.875}px with body line-height. Let content determine card height.
+- Card title: ${s.cardTitleSize}px in heading family. Card text: ${s.cardTextSize}px with body line-height. Let content determine card height.
 - Forms: persistent visible labels, clear helper/error text, correct input types, and descriptive submit labels. Use the body font. The specimen uses minimal underline inputs, transparent fill, 10px vertical padding, and a 1px border token.
 - Verify essential input boundaries reach 3:1 contrast or strengthen them using the text/focus palette. Preserve native validation and announce success/errors to assistive technology.
 
@@ -277,5 +304,5 @@ Use the mobile heading tokens at ≤600px content width via a container query or
 Generated with Styleguide Studio · Project schema v1. This is a visual specification, not a finished accessibility certification.
 `;
   }
-  return {fonts,fontCatalog,fontMetadata,validFontName,registerFont,weightsFor,nearestWeight,fontUrl,palette,presets,presetInfo,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
+  return {fonts,fontCatalog,fontMetadata,validFontName,registerFont,weightsFor,nearestWeight,fontUrl,palette,presets,presetInfo,numeric,enums,clone,isColor,safeUrl,sanitize,contrast,scaleSizes,typeSizes,mobileSizes,buttonValues,filename,cssTokens,markdown};
 });

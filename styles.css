@@ -159,3 +159,29 @@
   .font-candidate-sample { min-height: 80px; font-size: 32px; }
   .font-dialog-footnote { padding-left: 20px; padding-right: 20px; }
 }
+
+/* Direct typography and component dimensions. */
+.preset-source { margin: -9px 24px 15px; color: var(--app-muted); font-size: 9px; text-underline-offset: 3px; align-self: flex-start; }
+.heading-size-header, .heading-size-row { display: grid; grid-template-columns: 30px minmax(0,1fr) minmax(0,1fr); gap: 9px; align-items: center; }
+.heading-size-header { font: 8px "IBM Plex Mono", monospace; color: var(--app-muted); margin-bottom: 10px; }
+.heading-size-header > span:not(:first-child) { text-align: center; }
+.heading-size-row { border-top: 1px solid var(--app-line); padding: 12px 0; }
+.heading-size-row > span { font: 11px "IBM Plex Mono", monospace; color: var(--app-strong-muted); }
+.heading-size-row input[type="number"] { width: 100%; min-width: 0; border: 1px solid var(--app-line); border-radius: 4px; padding: 8px; font-size: 12px; color: var(--app-ink); background: var(--app-input); }
+.heading-size-row input[type="range"] { grid-column: 2 / -1; width: 100%; margin: 3px 0 0; accent-color: var(--app-strong-muted); height: 12px; cursor: pointer; }
+.scale-helper { display: flex; align-items: flex-end; gap: 8px; margin: 16px 0; }
+.scale-helper .field { margin: 0; flex: 1; min-width: 0; }
+.scale-helper .app-button { min-height: 39px; padding-left: 9px; padding-right: 9px; font-size: 10px; }
+.standalone-range { display: block; width: 100%; margin: -4px 0 24px; accent-color: var(--app-strong-muted); height: 12px; cursor: pointer; }
+.preview-page .preview-button, .preview-page .card-content .preview-button { font-size: var(--button-font-size,14px); }
+.preview-page .body-specimen small { font-size: var(--small-text-size,12px); }
+.preview-page .card-content h3, .preview-page .form-card h3 { font-size: var(--card-title-size,26px); }
+.preview-page .card-content p, .preview-page .form-card > p { font-size: var(--card-text-size,14px); }
+.preview-page .form-card label { font-size: var(--small-text-size,12px); }
+.preview-page .form-card input { font-size: var(--body-size,16px); }
+.preview-page .background-content h2 { font-size: var(--h2,48px); }
+.preview-page .background-content p { font-size: var(--body-size,16px); }
+.preview-page.is-mobile .background-content h2 { font-size: var(--mobile-h2,36px); }
+@container (max-width:600px) { .preview-page .background-content h2 { font-size: var(--mobile-h2,36px); } }
+@media(min-width:1600px) { .preset-source { margin-left: 28px; margin-right: 28px; } }
+@media(max-width:780px) { .preset-source { margin-left: 20px; margin-right: 20px; } .heading-size-row input[type="number"] { font-size: 14px; } }

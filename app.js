@@ -22,10 +22,14 @@
   C.palette.forEach(([key,label])=>$('#palette-controls').append(colorControl(key,label)));
   [['sectionBg','Base color'],['sectionEnd','Gradient end'],['sectionText','Section text']].forEach(([key,label])=>{const row=colorControl(key,label);if(key==='sectionEnd')row.dataset.show='gradient';$('#section-colors').append(row);});
   $('#overlay-color').append(colorControl('overlayColor','Overlay color'));
-  const originalPresets=document.createElement('optgroup'),inspiredPresets=document.createElement('optgroup');
-  originalPresets.label='Original directions';inspiredPresets.label='Inspired by design systems';
-  Object.keys(C.presets).forEach((key,i)=>{const option=new Option(String(i+1).padStart(2,'0')+' / '+C.presetInfo[key][0],key);(i<3?originalPresets:inspiredPresets).append(option);});
-  $('#preset').append(originalPresets,inspiredPresets);
+  const presetGroups=new Map();
+  Object.keys(C.presets).forEach((key,i)=>{const label=C.presetInfo[key][3]||(i<3?'Original directions':'Inspired by design systems');if(!presetGroups.has(label)){const group=document.createElement('optgroup');group.label=label;presetGroups.set(label,group);$('#preset').append(group);}presetGroups.get(label).append(new Option(String(i+1).padStart(2,'0')+' / '+C.presetInfo[key][0],key));});
+  for(let i=1;i<=6;i++){
+    const row=document.createElement('div');row.className='heading-size-row';
+    const label=document.createElement('span');label.textContent='H'+i;row.append(label);
+    for(const [key,max,description] of [['h'+i,200,'desktop'],['h'+i+'Mobile',160,'mobile']]){const input=document.createElement('input');input.type='number';input.min='8';input.max=String(max);input.step='0.5';input.dataset.key=key;input.setAttribute('aria-label','H'+i+' '+description+' size');row.append(input);}
+    const slider=document.createElement('input');slider.type='range';slider.min='8';slider.max='200';slider.step='0.5';slider.dataset.key='h'+i;slider.setAttribute('aria-label','H'+i+' desktop size slider');row.append(slider);$('#heading-size-controls').append(row);
+  }
   function populateFontSelects(){
     const names=Object.keys(C.fonts).sort((a,b)=>a.localeCompare(b));
     $$('.font-select').forEach(select=>{const oldValue=select.value;select.replaceChildren(...names.map(name=>new Option(name,name)));select.value=oldValue;});
@@ -38,7 +42,7 @@
       const el=$(`[data-key="${key}"]`);el.replaceChildren(...C.weightsFor(font).map(weight=>new Option(String(weight),String(weight))));el.value=state[key];
     }
   }
-  function syncPresetNote(){const info=C.presetInfo[state.preset];$('#preset-note').textContent=info[2]+(info[1]==='Original'?'':' Inspired direction; fully editable.');}
+  function syncPresetNote(){const info=C.presetInfo[state.preset];$('#preset-note').textContent=info[2]+(info[1]==='Original'?'':' Inspired direction; fully editable.');const link=$('#preset-source');link.hidden=!info[4];if(info[4])link.href=info[4];}
   function setTheme(theme,save=false){
     const dark=theme==='dark';document.documentElement.dataset.theme=theme;
     $('#theme-toggle').innerHTML=icon(dark?'moon':'sun')+'<span>'+(dark?'Dark':'Light')+'</span>';
@@ -48,7 +52,7 @@
   }
   setTheme(document.documentElement.dataset.theme||'dark');
   $('#theme-toggle').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark',true));
-  const controlLabels={headingFont:'Heading font',bodyFont:'Body font',h1:'H1 size',scale:'Type scale',headingWeight:'Heading weight',headingLine:'Heading line height',tracking:'Heading letter spacing',bodySize:'Body size in pixels',bodyLine:'Body line height',measure:'Reading width',radius:'Card corner radius',cardPadding:'Card padding',sectionSpace:'Section space',gradientAngle:'Gradient direction',grayscale:'Grayscale',overlayOpacity:'Overlay opacity'};
+  const controlLabels={headingFont:'Heading font',bodyFont:'Body font',scale:'Type scale',headingWeight:'Heading weight',headingLine:'Heading line height',tracking:'Heading letter spacing',bodySize:'Paragraph size',smallTextSize:'Small text size',bodyLine:'Body line height',measure:'Reading width',radius:'Card corner radius',cardPadding:'Card padding',sectionSpace:'Section space',gradientAngle:'Gradient direction',grayscale:'Grayscale',overlayOpacity:'Overlay opacity'};
   $$('[data-key]').forEach(el=>{if(controlLabels[el.dataset.key])el.setAttribute('aria-label',controlLabels[el.dataset.key]);});
   function syncControls() {
     if($$('.font-select').some(select=>![...select.options].some(option=>option.value===state[select.dataset.key])))populateFontSelects();
@@ -83,6 +87,9 @@
     }
     if(typeof value==='string'&&el.maxLength>0)value=value.slice(0,el.maxLength);
     state[key]=value;el.removeAttribute('aria-invalid');if(C.isColor(value))setColorUI(key);
+    if(key==='buttonShape'&&value!=='custom'){state.buttonRadius={pill:999,rounded:8,square:0}[value];$('[data-key="buttonRadius"]').value=state.buttonRadius;}
+    if(key==='buttonRadius'){state.buttonShape=value===0?'square':value===8?'rounded':value===999?'pill':'custom';$('[data-key="buttonShape"]').value=state.buttonShape;}
+    $$(`[data-key="${key}"]`).forEach(other=>{if(other!==el)other.value=state[key];});
     if(['headingFont','bodyFont','headingWeight','bodyWeight','buttonWeight'].includes(key))syncWeights();
     update();
   }
@@ -91,6 +98,9 @@
     el.addEventListener(el.dataset.key==='imageUrl'?'change':'input',()=>applyControl(el));
     if(type==='number')el.addEventListener('change',()=>{el.value=state[el.dataset.key];});
     if(el.classList.contains('hex-input'))el.addEventListener('blur',()=>{if(!C.isColor(el.value)){el.value=state[el.dataset.key];el.removeAttribute('aria-invalid');toast('Use a six-digit hex color, such as #2d2c2c.');}});
+  });
+  $('#apply-scale').addEventListener('click',()=>{
+    const sizes=C.scaleSizes(state),limits=[44,36,30,26,22,20];sizes.forEach((size,i)=>{state['h'+(i+1)]=size;state['h'+(i+1)+'Mobile']=Math.min(size,limits[i]);});syncControls();update();toast('Scale applied. You can still edit every desktop and mobile size independently.');
   });
   function setupTabs(selector,attribute,callback) {
     const tabs=$$(selector);
@@ -108,6 +118,7 @@
     const page=$('#preview-page'),sizes=C.typeSizes(state),mobile=C.mobileSizes(state),b=C.buttonValues(state);
     const vars={};C.palette.forEach(([key])=>vars[key==='background'?'--p-bg':'--p-'+key.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())]=state[key]);
     Object.assign(vars,{'--p-heading-font':C.fonts[state.headingFont],'--p-body-font':C.fonts[state.bodyFont],'--body-weight':state.bodyWeight||'400','--strong-weight':C.nearestWeight(state.bodyFont,600),'--heading-weight':state.headingWeight,'--heading-line':state.headingLine,'--tracking':state.tracking+'em','--body-size':state.bodySize+'px','--body-line':state.bodyLine,'--measure':state.measure+'ch','--button-height':b.height+'px','--button-padding':b.padding+'px','--button-radius':b.radius+'px','--button-weight':state.buttonWeight,'--card-radius':state.radius+'px','--card-padding':state.cardPadding+'px','--card-border':state.cardStyle==='border'?'1px solid var(--p-border)':'0 solid transparent','--card-shadow':state.cardStyle==='shadow'?'0 8px 28px rgb(0 0 0 / 0.08)':'none','--section-space':state.sectionSpace+'px','--content-width':state.contentWidth+'px','--section-bg':state.sectionBg,'--section-text':state.sectionText,'--image-position':state.imagePosition,'--grayscale':state.grayscale+'%','--image-ratio':state.imageRatio,'--focus-color':state.focusColor,'--duration':state.duration+'ms'});
+    Object.assign(vars,{'--button-font-size':state.buttonTextSize+'px','--small-text-size':state.smallTextSize+'px','--card-title-size':state.cardTitleSize+'px','--card-text-size':state.cardTextSize+'px'});
     sizes.forEach((v,i)=>vars['--h'+(i+1)]=v+'px');mobile.forEach((v,i)=>vars['--mobile-h'+(i+1)]=v+'px');
     Object.entries(vars).forEach(([key,value])=>page.style.setProperty(key,value));
     page.dataset.arrow=state.buttonArrow;page.dataset.hover=state.buttonHover;
@@ -124,7 +135,7 @@
     $('#palette-swatches').replaceChildren(...C.palette.map(([key,label,short])=>{const el=document.createElement('div');el.className='palette-swatch';const chip=document.createElement('div');chip.className='chip';chip.style.setProperty('--chip',state[key]);chip.setAttribute('aria-label',label+' '+state[key]);const name=document.createElement('strong');name.textContent=short;const hex=document.createElement('code');hex.textContent=state[key].toUpperCase();el.append(chip,name,hex);return el;}));
     $('#type-meta').replaceChildren(...['Headings / '+state.headingFont+' '+state.headingWeight,'Body / '+state.bodyFont+' '+state.bodyWeight].map(t=>{const el=document.createElement('span');el.textContent=t;return el;}));
     const words=['A clear point of view.','Make room for ideas.','Good things, considered.','Every detail matters.','Simple. Useful. Human.','A little more intention.'];
-    $('#type-specimens').replaceChildren(...sizes.map((size,i)=>{const row=document.createElement('div');row.className='type-specimen';const label=document.createElement('span');label.className='type-name';label.textContent='H'+(i+1);const heading=document.createElement('h'+(i+1));heading.textContent=words[i];const detail=document.createElement('span');detail.className='type-size';detail.textContent=size+' / '+state.headingWeight;row.append(label,heading,detail);return row;}));
+    $('#type-specimens').replaceChildren(...sizes.map((size,i)=>{const row=document.createElement('div');row.className='type-specimen';const label=document.createElement('span');label.className='type-name';label.textContent='H'+(i+1);const heading=document.createElement('h'+(i+1));heading.textContent=words[i];const detail=document.createElement('span');detail.className='type-size';detail.textContent=size+' / '+mobile[i]+'px';detail.title='Desktop / mobile size';row.append(label,heading,detail);return row;}));
     const steps=[1,2,3,4,6,8].map(x=>x*state.spacing);
     $('#spacing-bars').replaceChildren(...steps.map((size,i)=>{const div=document.createElement('div');div.className='spacing-item';const block=document.createElement('div');block.className='spacing-block';block.style.setProperty('--size',size+'px');block.style.setProperty('--opacity',.2+i*.15);const label=document.createElement('span');label.textContent=size;div.append(block,label);return div;}));
     $('#spacing-caption').textContent=state.spacing+'px rhythm · '+state.sectionSpace+'px section space · '+state.contentWidth+'px content width';
