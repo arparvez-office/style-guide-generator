@@ -16,12 +16,13 @@
     const swatch=document.createElement('label');swatch.className='color-swatch';swatch.title='Choose '+label.toLowerCase();
     const picker=document.createElement('input');picker.type='color';picker.dataset.key=key;picker.setAttribute('aria-label',label+' color');swatch.append(picker);
     const name=document.createElement('label');name.textContent=label;name.htmlFor='hex-'+key;
-    const hex=document.createElement('input');hex.className='hex-input';hex.id='hex-'+key;hex.dataset.key=key;hex.type='text';hex.maxLength=7;hex.spellcheck=false;hex.setAttribute('aria-label',label+' hex value');hex.pattern='#[0-9a-fA-F]{6}';
+    const hex=document.createElement('input');hex.className='hex-input';hex.id='hex-'+key;hex.dataset.key=key;hex.type='text';hex.maxLength=20;hex.placeholder='#3aa6b9';hex.autocomplete='off';hex.spellcheck=false;hex.setAttribute('aria-label',label+' hex value');hex.pattern='#[0-9a-fA-F]{6}';
     row.append(swatch,name,hex);return row;
   }
   C.palette.forEach(([key,label])=>$('#palette-controls').append(colorControl(key,label)));
   [['sectionBg','Base color'],['sectionEnd','Gradient end'],['sectionText','Section text']].forEach(([key,label])=>{const row=colorControl(key,label);if(key==='sectionEnd')row.dataset.show='gradient';$('#section-colors').append(row);});
   $('#overlay-color').append(colorControl('overlayColor','Overlay color'));
+  $('#focus-color-control').append(colorControl('focusColor','Focus ring'));
   const presetGroups=new Map();
   Object.keys(C.presets).forEach((key,i)=>{const label=C.presetInfo[key][3]||(i<3?'Original directions':'Inspired by design systems');if(!presetGroups.has(label)){const group=document.createElement('optgroup');group.label=label;presetGroups.set(label,group);$('#preset').append(group);}presetGroups.get(label).append(new Option(String(i+1).padStart(2,'0')+' / '+C.presetInfo[key][0],key));});
   $('#preset-count').textContent=Object.keys(C.presets).length+' presets';
@@ -80,6 +81,7 @@
     let value=el.type==='checkbox'?el.checked:el.value;
     if(C.numeric[key]) {value=Number(value);if(el.value===''||!Number.isFinite(value))return;const[min,max]=C.numeric[key];value=Math.min(max,Math.max(min,value));}
     if(C.isColor(state[key])) {
+      if(el.classList.contains('hex-input')){value=value.trim();if(/^[0-9a-fA-F]{6}$/.test(value))value='#'+value;if(/^#?[0-9a-fA-F]{3}$/.test(value)){const h=value.replace('#','');value='#'+[...h].map(c=>c+c).join('');}}
       if(!C.isColor(value)){el.setAttribute('aria-invalid','true');return;}
       value=value.toLowerCase();
     }
@@ -129,7 +131,7 @@
     page.style.colorScheme=C.contrast(state.background,'#ffffff')>7?'dark':'light';
     $('#preview-name').textContent=state.name;$('#footer-name').textContent=state.name;
     for(const [key] of C.palette)setColorUI(key);
-    for(const key of ['sectionBg','sectionEnd','sectionText','overlayColor'])setColorUI(key);
+    for(const key of ['sectionBg','sectionEnd','sectionText','overlayColor','focusColor'])setColorUI(key);
     const units={h1:'px',tracking:'em',measure:'ch',radius:'px',cardPadding:'px',sectionSpace:'px',gradientAngle:'°',grayscale:'%',overlayOpacity:'%'};
     $$('[data-output]').forEach(output=>output.textContent=state[output.dataset.output]+units[output.dataset.output]);
     $$('[data-show]').forEach(el=>el.hidden=el.dataset.show!==state.backgroundStyle);

@@ -58,7 +58,7 @@
       <div class="settings-scroll">
         <section id="panel-basics" class="settings-panel" role="tabpanel" aria-labelledby="tab-basics">
           <div class="control-group"><h2><span>01</span> Identity</h2><label class="field">Project name<input data-key="name" maxlength="60" type="text"></label><label class="field">Design intent<textarea data-key="intent" rows="3" maxlength="500"></textarea></label></div>
-          <div class="control-group"><h2><span>02</span> Color palette</h2><p class="control-note">Semantic roles. One consistent palette.</p><div id="palette-controls"></div></div>
+          <div class="control-group"><h2><span>02</span> Color palette</h2><p class="control-note">Click a swatch or paste a hex code, such as #3aa6b9.</p><div id="palette-controls"></div></div>
           <div class="contrast-panel"><div class="contrast-heading">Contrast check <span>WCAG AA · normal text</span></div><div class="contrast-row"><span>Text / background</span><strong id="text-contrast"></strong></div><div class="contrast-row"><span>Button label / fill</span><strong id="button-contrast"></strong></div><div class="contrast-row"><span>Muted / background</span><strong id="muted-contrast"></strong></div><p>Check every final text/background pairing, including images and overlays.</p></div>
         </section>
         <section id="panel-type" class="settings-panel" role="tabpanel" aria-labelledby="tab-type" hidden>
@@ -78,7 +78,7 @@
         </section>
         <section id="panel-rules" class="settings-panel" role="tabpanel" aria-labelledby="tab-rules" hidden>
           <div class="control-group"><h2><span>01</span> Creative direction</h2><label class="field">Personality<textarea data-key="personality" rows="4" maxlength="1000"></textarea></label><label class="field">Do more of<textarea data-key="doRules" rows="5" maxlength="2000"></textarea></label><label class="field">Avoid<textarea data-key="avoidRules" rows="5" maxlength="2000"></textarea></label><p class="control-note">One instruction per line. These become explicit rules in your Markdown guide.</p></div>
-          <div class="control-group"><h2><span>02</span> Interaction</h2><label class="field">Motion duration<select data-key="duration"><option value="0">None · 0ms</option><option value="150">Quick · 150ms</option><option value="200">Calm · 200ms</option><option value="300">Soft · 300ms</option></select></label><label class="field">Focus ring color<input data-key="focusColor" type="color" class="wide-color" aria-label="Focus ring color"></label><p class="control-note">Keyboard focus, reduced motion, descriptive labels, and accessible contrast are always included in the guide.</p></div>
+          <div class="control-group"><h2><span>02</span> Interaction</h2><label class="field">Motion duration<select data-key="duration"><option value="0">None · 0ms</option><option value="150">Quick · 150ms</option><option value="200">Calm · 200ms</option><option value="300">Soft · 300ms</option></select></label><div id="focus-color-control"></div><p class="control-note">Keyboard focus, reduced motion, descriptive labels, and accessible contrast are always included in the guide.</p></div>
         </section>
       </div>
       <div class="editor-footer"><span class="live-dot"></span><span>Every choice updates your guide.</span><span class="small-arrow">↗</span></div>

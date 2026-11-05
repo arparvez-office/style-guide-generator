@@ -200,3 +200,9 @@
 .font-control select{flex:1;width:0}
 @media(min-width:1600px){.preset-control,.selector-hint{margin-left:28px;margin-right:28px}}
 @media(max-width:780px){.preset-control,.selector-hint{margin-left:20px;margin-right:20px}.selector-step{width:32px;min-height:40px}}
+
+/* Make editable hex values visible beside every color swatch. */
+.color-control{grid-template-columns:30px minmax(0,1fr) 100px;gap:8px}
+.color-control .hex-input{width:100%;min-width:0;text-align:left;background:var(--app-input);color:var(--app-ink);border:1px solid var(--app-line);border-radius:4px;padding:8px;font:11px "IBM Plex Mono",monospace}
+.color-control .hex-input:focus{border-color:var(--app-accent)}
+.color-control .hex-input[aria-invalid=true]{border-color:#bd3825}
