@@ -114,7 +114,7 @@
   }
   function scrollPreview(panel) {
     if($('#preview-view').hidden)return;
-    const target=$({basics:'.preview-topline',type:'.type-section',ui:'#components',media:'#background-specimen',rules:'.preview-topline'}[panel]);
+    const target=$({basics:'.preview-topline',type:'.type-section',ui:'#components',media:'#background-specimen'}[panel]);
     const area=$('#canvas-area');area.scrollTop+=target.getBoundingClientRect().top-area.getBoundingClientRect().top-22;
   }
   setupTabs('.settings-tabs [role=tab]','panel',panel=>{$('.settings-scroll').scrollTop=0;scrollPreview(panel);});
